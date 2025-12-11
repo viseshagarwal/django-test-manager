@@ -9,6 +9,18 @@
     ·
     <a href="https://github.com/viseshagarwal/django-test-manager/discussions">Request Feature</a>
   </p>
+
+  <p>
+    <a href="https://marketplace.visualstudio.com/items?itemName=ViseshAgarwal.django-test-manager">
+      <img src="https://img.shields.io/visual-studio-marketplace/v/ViseshAgarwal.django-test-manager?style=flat&label=VS%20Code%20Marketplace&logo=visual-studio-code" alt="VS Code Marketplace Version" />
+    </a>
+    <a href="https://open-vsx.org/extension/viseshagarwal/django-test-manager">
+      <img src="https://img.shields.io/open-vsx/v/viseshagarwal/django-test-manager?style=flat&label=Open%20VSX&logo=eclipse-ide" alt="Open VSX Version" />
+    </a>
+    <a href="https://marketplace.visualstudio.com/items?itemName=ViseshAgarwal.django-test-manager">
+      <img src="https://img.shields.io/visual-studio-marketplace/i/ViseshAgarwal.django-test-manager?style=flat" alt="Installs" />
+    </a>
+  </p>
 </div>
 
 ---
@@ -29,10 +41,15 @@
 ## 📦 Installation
 
 **Via VS Code Marketplace:**
+<a href="https://marketplace.visualstudio.com/items?itemName=ViseshAgarwal.django-test-manager">Get it from the Visual Studio Marketplace</a>
+
 1. Open **VS Code**.
 2. Go to the **Extensions** view (`Cmd+Shift+X` or `Ctrl+Shift+X`).
 3. Search for `Django Test Manager`.
 4. Click **Install**.
+
+**Via Open VSX Registry:**
+<a href="https://open-vsx.org/extension/viseshagarwal/django-test-manager">Get it from Open VSX</a>
 
 **Via VSIX (Manual):**
 1. Download the latest `.vsix` release from the GitHub releases page.
