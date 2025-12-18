@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { TestTreeDataProvider, TestItem } from './testTree';
 import { TestRunner } from './testRunner';
 import { DjangoTestCodeLensProvider } from './testCodeLensProvider';
@@ -9,24 +10,151 @@ import { TestDecorationProvider } from './testDecorations';
 import { TestStatusBar } from './testStatusBar';
 import { TestStateManager } from './testStateManager';
 
+/**
+ * Reads and parses a .env file
+ * @param envFilePath Path to the .env file
+ * @returns Object with environment variables from the file
+ */
+async function readEnvFile(envFilePath: string): Promise<{ [key: string]: string }> {
+    const envVars: { [key: string]: string } = {};
+    
+    try {
+        if (!fs.existsSync(envFilePath)) {
+            return envVars;
+        }
+
+        const content = await vscode.workspace.fs.readFile(vscode.Uri.file(envFilePath));
+        const lines = content.toString().split('\n');
+
+        for (const line of lines) {
+            // Remove leading/trailing whitespace
+            const trimmed = line.trim();
+            
+            // Skip empty lines and comments
+            if (!trimmed || trimmed.startsWith('#')) {
+                continue;
+            }
+
+            // Parse KEY=VALUE format
+            const equalIndex = trimmed.indexOf('=');
+            if (equalIndex === -1) {
+                continue;
+            }
+
+            const key = trimmed.substring(0, equalIndex).trim();
+            let value = trimmed.substring(equalIndex + 1).trim();
+
+            // Remove quotes if present
+            if ((value.startsWith('"') && value.endsWith('"')) || 
+                (value.startsWith("'") && value.endsWith("'"))) {
+                value = value.slice(1, -1);
+            }
+
+            if (key) {
+                envVars[key] = value;
+            }
+        }
+    } catch (error) {
+        console.error(`Error reading .env file at ${envFilePath}:`, error);
+    }
+
+    return envVars;
+}
+
+/**
+ * Merges environment variables from multiple sources in priority order:
+ * 1. Process environment variables (lowest priority)
+ * 2. .env file variables (middle priority)
+ * 3. Configuration environmentVariables (highest priority)
+ * @param workspaceRoot Root path of the workspace/project
+ * @returns Merged environment variables object
+ */
+export async function getMergedEnvironmentVariables(workspaceRoot: string): Promise<{ [key: string]: string }> {
+    const config = vscode.workspace.getConfiguration('djangoTestManager');
+    const configEnv = config.get<{ [key: string]: string }>('environmentVariables') || {};
+    const envFilePath = config.get<string>('envFilePath') || '.env';
+
+    // Start with process environment variables (filter out undefined values)
+    const mergedEnv: { [key: string]: string } = {};
+    for (const key in process.env) {
+        const value = process.env[key];
+        if (value !== undefined) {
+            mergedEnv[key] = value;
+        }
+    }
+
+    // Load from .env file if path is specified
+    if (envFilePath) {
+        const fullEnvPath = resolvePath(envFilePath, workspaceRoot);
+        const envFileVars = await readEnvFile(fullEnvPath);
+        // Merge .env file variables (overrides process.env)
+        Object.assign(mergedEnv, envFileVars);
+    }
+
+    // Merge configuration variables (overrides .env file and process.env)
+    Object.assign(mergedEnv, configEnv);
+
+    return mergedEnv;
+}
+
+/**
+ * Resolves a path that may contain variable substitutions like ${workspaceFolder}
+ * Supports:
+ * - Variable substitution: ${workspaceFolder}/path/to/file
+ * - Absolute paths: /absolute/path/to/file
+ * - Relative paths: relative/path/to/file (resolved relative to workspaceRoot)
+ * @param pathValue The path value from configuration
+ * @param workspaceRoot The workspace root path
+ * @returns Resolved absolute path
+ */
+export function resolvePath(pathValue: string, workspaceRoot: string, defaultPath?: string): string {
+    if (!pathValue) {
+        return defaultPath ? path.join(workspaceRoot, defaultPath) : workspaceRoot;
+    }
+
+    // Get workspace folder for variable substitution
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || vscode.workspace.rootPath || workspaceRoot;
+
+    // Replace ${workspaceFolder} variable
+    let resolvedPath = pathValue.replace(/\$\{workspaceFolder\}/g, workspaceFolder);
+
+    // If it's already an absolute path, return it as-is
+    if (path.isAbsolute(resolvedPath)) {
+        return resolvedPath;
+    }
+
+    // Otherwise, resolve it relative to workspaceRoot
+    return path.resolve(workspaceRoot, resolvedPath);
+}
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('Django Test Manager is now active!');
 
-    const workspaceRoot = vscode.workspace.rootPath;
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || vscode.workspace.rootPath;
     if (!workspaceRoot) {
         vscode.window.showErrorMessage('No workspace folder opened. Django Test Manager cannot activate.');
         return;
     }
-
-    const testDiscovery = new TestDiscovery(workspaceRoot);
-    const testTreeDataProvider = new TestTreeDataProvider(workspaceRoot, testDiscovery);
+    const config = vscode.workspace.getConfiguration('djangoTestManager');
+    let resolvedWorkspaceRoot = config.get<string>('projectRoot') ?? '';
+    
+    // If projectRoot config is empty, use workspace root
+    if (!resolvedWorkspaceRoot) {
+        resolvedWorkspaceRoot = workspaceRoot;
+    } else if (!path.isAbsolute(resolvedWorkspaceRoot)) {
+        // If relative, resolve it relative to workspace root
+        resolvedWorkspaceRoot = path.resolve(workspaceRoot, resolvedWorkspaceRoot);
+    }
+    
+    const testDiscovery = new TestDiscovery(resolvedWorkspaceRoot);
+    const testTreeDataProvider = new TestTreeDataProvider(resolvedWorkspaceRoot, testDiscovery);
 
     // Use createTreeView to get access to the view instance
     const treeView = vscode.window.createTreeView('djangoTestExplorer', {
         treeDataProvider: testTreeDataProvider
     });
 
-    const testRunner = new TestRunner(workspaceRoot, testTreeDataProvider);
+    const testRunner = new TestRunner(resolvedWorkspaceRoot, testTreeDataProvider);
 
     // Status Bar
     const statusBar = new TestStatusBar();
@@ -55,8 +183,9 @@ export function activate(context: vscode.ExtensionContext) {
 
             const config = vscode.workspace.getConfiguration('djangoTestManager');
             const pythonPath = config.get<string>('pythonPath') || 'python';
-            const managePyPath = config.get<string>('managePyPath') || 'manage.py';
-            const env = config.get<{ [key: string]: string }>('environmentVariables') || {};
+            const managePyPathConfig = config.get<string>('managePyPath') || 'manage.py';
+            const managePyPath = resolvePath(managePyPathConfig, resolvedWorkspaceRoot, 'manage.py');
+            const env = await getMergedEnvironmentVariables(resolvedWorkspaceRoot);
             const rawTestArgs = config.get<string[]>('testArguments') || [];
 
             // Filter out arguments that interfere with debugging
@@ -75,7 +204,7 @@ export function activate(context: vscode.ExtensionContext) {
                 testArgs.push(arg);
             }
 
-            const managePyFull = path.join(workspaceRoot, managePyPath);
+            const managePyFull = managePyPath;
             try {
                 await vscode.workspace.fs.stat(vscode.Uri.file(managePyFull));
             } catch {
@@ -88,14 +217,14 @@ export function activate(context: vscode.ExtensionContext) {
                 name: debugConfigName,
                 type: 'debugpy',
                 request: 'launch',
-                program: path.join(workspaceRoot, managePyPath),
+                program: managePyPath,
                 args: ['test', node.dottedPath, '--noinput', ...testArgs],
                 console: 'integratedTerminal',
                 env: env,
                 justMyCode: false,
                 subProcess: true,
                 django: true,
-                cwd: workspaceRoot
+                cwd: resolvedWorkspaceRoot
             };
 
             // Update launch.json
@@ -125,7 +254,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
 
                 if (newConfigs.length === 0) {
-                    const vscodeDir = path.join(workspaceRoot, '.vscode');
+                    const vscodeDir = path.join(resolvedWorkspaceRoot, '.vscode');
                     const launchJsonPath = path.join(vscodeDir, 'launch.json');
                     try {
                         await vscode.workspace.fs.delete(vscode.Uri.file(launchJsonPath));
@@ -232,8 +361,16 @@ export function activate(context: vscode.ExtensionContext) {
             const uri = editor.document.uri;
             const fileName = path.basename(uri.fsPath);
 
+            // Check if current file is a valid test file:
+            // 1. File is in tests directory/package, OR
+            // 2. File is named test.py or tests.py
+            const currentFileRelativePath = vscode.workspace.asRelativePath(uri);
+            const pathParts = currentFileRelativePath.split(path.sep);
+            const isInTestsDirectory = pathParts.some(part => part === 'tests' || part === 'test');
+            const isTestFile = fileName === 'test.py' || fileName === 'tests.py';
+            
             // If it's already a test file, just run it
-            if (fileName.startsWith('test_') || fileName.endsWith('_test.py')) {
+            if (isInTestsDirectory || isTestFile) {
                 vscode.commands.executeCommand('django-test-manager.runCurrentFile');
                 return;
             }
@@ -241,8 +378,8 @@ export function activate(context: vscode.ExtensionContext) {
             const nameWithoutExt = fileName.replace('.py', '');
             const testNames = [`test_${nameWithoutExt}.py`, `${nameWithoutExt}_test.py`];
 
-            // Search for test files
-            const files = await vscode.workspace.findFiles(`**/{${testNames.join(',')}}`, '**/node_modules/**', 10);
+            // Search for test files in tests directory or named test.py/tests.py
+            const files = await vscode.workspace.findFiles(`**/{tests/**/{${testNames.join(',')}},test.py,tests.py}`, '**/node_modules/**', 10);
 
             if (files.length === 0) {
                 vscode.window.showErrorMessage(`No related test file found for ${fileName}.`);
@@ -373,7 +510,7 @@ export function activate(context: vscode.ExtensionContext) {
                 { language: 'python', scheme: 'file' },
                 { language: 'python', scheme: 'untitled' }
             ],
-            new DjangoTestCodeLensProvider(workspaceRoot)
+            new DjangoTestCodeLensProvider(resolvedWorkspaceRoot)
         )
     );
 

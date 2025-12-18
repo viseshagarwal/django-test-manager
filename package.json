@@ -241,7 +241,7 @@
         "djangoTestManager.managePyPath": {
           "type": "string",
           "default": "manage.py",
-          "description": "Path to manage.py file"
+          "description": "Path to manage.py file. Supports relative paths (relative to projectRoot), absolute paths, or variable substitution like ${workspaceFolder}/path/to/manage.py"
         },
         "djangoTestManager.testCommandTemplate": {
           "type": "string",
@@ -258,13 +258,15 @@
           "default": {},
           "description": "Environment variables to set when running tests"
         },
+        "djangoTestManager.envFilePath": {
+          "type": "string",
+          "default": ".env",
+          "description": "Path to .env file. Supports relative paths (relative to projectRoot), absolute paths, or variable substitution like ${workspaceFolder}/.env. Set to empty string to disable .env file loading."
+        },
         "djangoTestManager.testProfiles": {
           "type": "object",
           "default": {
-            "Default": [
-              "--keepdb",
-              "--parallel"
-            ],
+            "Default": [],
             "Fast": [
               "--keepdb",
               "--failfast",
@@ -272,9 +274,13 @@
             ],
             "Clean": [
               "--noinput"
+            ],
+            "Parallel": [
+              "--keepdb",
+              "--parallel"
             ]
           },
-          "description": "Define test profiles with specific arguments"
+          "description": "Define test profiles with specific arguments. Default profile runs tests sequentially. Use Parallel or Fast profiles for parallel execution."
         },
         "djangoTestManager.activeProfile": {
           "type": "string",
@@ -283,13 +289,18 @@
         },
         "djangoTestManager.testFilePattern": {
           "type": "string",
-          "default": "**/*test*.py",
-          "description": "Glob pattern to find test files (e.g. **/*test*.py, **/tests.py)"
+          "default": "**/{tests/**/*.py,test.py,tests.py}",
+          "description": "Glob pattern to find test files. Default: **/{tests/**/*.py,test.py,tests.py} (files in tests directory/package OR files named test.py/tests.py)."
         },
         "djangoTestManager.testMethodPattern": {
           "type": "string",
           "default": "test_",
           "description": "Prefix for test methods (e.g. 'test_'). Used to identify test methods in files."
+        },
+        "djangoTestManager.projectRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Root path of the Django project. If empty, uses workspace root. Can be absolute or relative to workspace root."
         }
       }
     }

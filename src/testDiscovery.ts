@@ -25,14 +25,15 @@ export class TestDiscovery {
 
     async discover(): Promise<TestNode[]> {
         // Find all python files that might contain tests
+        // Tests can be in tests package/directory OR files named test.py/tests.py
         const config = vscode.workspace.getConfiguration('djangoTestManager');
-        const filePattern = config.get<string>('testFilePattern') || '**/*test*.py';
+        const filePattern = config.get<string>('testFilePattern') || '**/{tests/**/*.py,test.py,tests.py}';
         const pattern = new vscode.RelativePattern(this.workspaceRoot, filePattern);
         const excludePattern = '**/{node_modules,venv,.venv,env,.env}/**';
         const files = await vscode.workspace.findFiles(pattern, excludePattern);
 
         if (files.length === 0) {
-            vscode.window.showInformationMessage('No Django tests found. Make sure your test files match the pattern *test*.py');
+            vscode.window.showInformationMessage('No Django tests found. Make sure your test files are in a tests directory or named test.py/tests.py');
         }
 
         // Clear existing cache on full discover
@@ -68,6 +69,19 @@ export class TestDiscovery {
 
     public async parseFile(uri: vscode.Uri): Promise<TestNode | null> {
         try {
+            // Check if file is a valid test file:
+            // 1. File is in tests directory/package, OR
+            // 2. File is named test.py or tests.py
+            const relativePath = path.relative(this.workspaceRoot, uri.fsPath);
+            const pathParts = relativePath.split(path.sep);
+            const fileName = path.basename(uri.fsPath);
+            const isInTestsDirectory = pathParts.some(part => part === 'tests' || part === 'test');
+            const isTestFile = fileName === 'test.py' || fileName === 'tests.py';
+            
+            if (!isInTestsDirectory && !isTestFile) {
+                return null; // Not a test file
+            }
+
             const content = (await vscode.workspace.fs.readFile(uri)).toString();
             const lines = content.split('\n');
 
@@ -80,7 +94,6 @@ export class TestDiscovery {
                 this.methodRegex = new RegExp(`^\\s+(?:async\\s+)?def\\s+(${currentPrefix}\\w+)`);
             }
 
-            const relativePath = path.relative(this.workspaceRoot, uri.fsPath);
             const fileDottedPath = relativePath.replace(/\.py$/, '').replace(new RegExp(path.sep.replace(/\\/g, '\\\\'), 'g'), '.');
 
             const fileNode: TestNode = {
@@ -102,32 +115,54 @@ export class TestDiscovery {
                     const classMatch = line.match(this.classRegex);
                     if (classMatch) {
                         const className = classMatch[1];
-                        currentClass = {
-                            name: className,
-                            type: 'class',
-                            children: [],
-                            uri: uri,
-                            range: new vscode.Range(i, 0, i, line.length),
-                            dottedPath: `${fileDottedPath}.${className}`,
-                            parent: fileNode
-                        };
-                        fileNode.children?.push(currentClass);
+                        // Only detect classes that start with "Test" (e.g., TestCase, TestMyClass)
+                        if (className.startsWith('Test')) {
+                            currentClass = {
+                                name: className,
+                                type: 'class',
+                                children: [],
+                                uri: uri,
+                                range: new vscode.Range(i, 0, i, line.length),
+                                dottedPath: `${fileDottedPath}.${className}`,
+                                parent: fileNode
+                            };
+                            fileNode.children?.push(currentClass);
+                        } else {
+                            currentClass = null; // Reset if class doesn't start with Test
+                        }
                         continue;
                     }
                 }
 
-                if ((trimmed.startsWith('def ') || trimmed.startsWith('async def ')) && currentClass) {
+                // Detect test methods: either inside Test classes or standalone methods starting with test_
+                if (trimmed.startsWith('def ') || trimmed.startsWith('async def ')) {
                     const methodMatch = this.methodRegex ? line.match(this.methodRegex) : null;
                     if (methodMatch) {
                         const methodName = methodMatch[1];
-                        currentClass.children?.push({
-                            name: methodName,
-                            type: 'method',
-                            uri: uri,
-                            range: new vscode.Range(i, 0, i, line.length),
-                            dottedPath: `${currentClass.dottedPath}.${methodName}`,
-                            parent: currentClass
-                        });
+                        if (currentClass) {
+                            // Method inside a Test class
+                            currentClass.children?.push({
+                                name: methodName,
+                                type: 'method',
+                                uri: uri,
+                                range: new vscode.Range(i, 0, i, line.length),
+                                dottedPath: `${currentClass.dottedPath}.${methodName}`,
+                                parent: currentClass
+                            });
+                        } else {
+                            // Standalone test method (not in a class) - add directly to file
+                            if (!fileNode.children) {
+                                fileNode.children = [];
+                            }
+                            fileNode.children.push({
+                                name: methodName,
+                                type: 'method',
+                                uri: uri,
+                                range: new vscode.Range(i, 0, i, line.length),
+                                dottedPath: `${fileDottedPath}.${methodName}`,
+                                parent: fileNode
+                            });
+                        }
                     }
                 }
             }

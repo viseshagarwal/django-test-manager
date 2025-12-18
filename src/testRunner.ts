@@ -5,6 +5,7 @@ import { TestNode } from "./testDiscovery";
 import { TestTreeDataProvider } from "./testTree";
 import { TestStateManager } from "./testStateManager";
 import { DjangoTerminal } from "./djangoTerminal";
+import { getMergedEnvironmentVariables, resolvePath } from "./extension";
 
 export class TestRunner {
     private outputChannel: vscode.OutputChannel;
@@ -47,13 +48,7 @@ export class TestRunner {
         const fullCmd = `${cmd} ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`;
         this.outputChannel.appendLine(`Running: ${fullCmd}`);
 
-        const config = vscode.workspace.getConfiguration("djangoTestManager");
-        const configEnv =
-            config.get<{ [key: string]: string }>("environmentVariables") || {};
-        const env = {
-            ...process.env,
-            ...configEnv,
-        };
+        const env = await getMergedEnvironmentVariables(this.workspaceRoot);
 
         return vscode.window.withProgress(
             {
@@ -243,7 +238,8 @@ export class TestRunner {
     private buildTestCommandParts(testPaths: string): { cmd: string, args: string[] } {
         const config = vscode.workspace.getConfiguration("djangoTestManager");
         let pythonPath = config.get<string>("pythonPath") || "python3";
-        const managePyPath = config.get<string>("managePyPath") || "manage.py";
+        const managePyPathConfig = config.get<string>("managePyPath") || "manage.py";
+        const managePyPath = resolvePath(managePyPathConfig, this.workspaceRoot, 'manage.py');
 
         // Auto-detect venv
         if (pythonPath === "python3" || pythonPath === "python") {
@@ -363,10 +359,6 @@ export class TestRunner {
             "djangoTestManager.isRunning",
             true
         );
-        const config = vscode.workspace.getConfiguration("djangoTestManager");
-        const configEnv =
-            config.get<{ [key: string]: string }>("environmentVariables") || {};
-
         if (!this.djangoTerminal) {
             this.djangoTerminal = new DjangoTerminal();
         }
@@ -392,11 +384,12 @@ export class TestRunner {
             this.processParsingBuffer(nodeToWatch);
         }, 200); // Process buffer every 200ms
 
+        const env = await getMergedEnvironmentVariables(this.workspaceRoot);
         this.djangoTerminal.runCommand(
             cmd,
             args,
             this.workspaceRoot,
-            { ...process.env, ...configEnv },
+            env,
             (data: string) => {
                 // Just accumulate data, don't parse immediately
                 this.parsingBuffer += data;

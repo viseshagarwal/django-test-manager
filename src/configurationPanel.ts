@@ -94,7 +94,7 @@ export class ConfigurationPanel {
         const managePyPath = config.get<string>('managePyPath') || 'manage.py';
         const testCommandTemplate = config.get<string>('testCommandTemplate') || '${pythonPath} ${managePyPath} test ${testPath} ${testArguments}';
         const testArguments = (config.get<string[]>('testArguments') || []).join(' ');
-        const testFilePattern = config.get<string>('testFilePattern') || '**/*test*.py';
+        const testFilePattern = config.get<string>('testFilePattern') || '**/{tests/**/*.py,test.py,tests.py}';
         const testMethodPattern = config.get<string>('testMethodPattern') || 'test_';
 
         const envMap = config.get<{ [key: string]: string }>('environmentVariables') || {};
@@ -267,7 +267,7 @@ export class ConfigurationPanel {
                     <div class="section-title">Discovery</div>
                     <div class="form-group">
                         <label for="testFilePattern">Test File Pattern</label>
-                        <input type="text" id="testFilePattern" value="${testFilePattern}" placeholder="e.g. **/*test*.py">
+                        <input type="text" id="testFilePattern" value="${testFilePattern}" placeholder="e.g. **/{tests/**/*.py,test.py,tests.py}">
                         <div class="help-text">Glob pattern to find test files.</div>
                     </div>
 
