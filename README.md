@@ -29,14 +29,14 @@
 
 ## ✨ Key Features
 
-*   **🔍 Smart Discovery**: Automatically detects tests, including **Async Tests** (`async def`). View your suite hierarchically by app, file, class, and method.
-*   **⚡ Fast Execution**: Optimized runner with **native tree icons** and reduced overhead.
-*   **▶️ One-Click Run**: execute individual methods, classes, files, or the entire suite instantly.
-*   **🐞 Zero-Config Debugging**: Click the debug icon next to any test to start a session. We handle `launch.json` for you.
-*   **🔎 Instant Search**: integrated "Search Tests" command to jump to any test in your large codebase.
-*   **⚙️ Test Profiles**: Switch between different run configurations (e.g., `Fast` with `--failfast`, `CI` with `--keepdb`) on the fly.
-*   **📦 Native Experience**: Uses VS Code's native file icons and themes for a seamless look.
-*   **📝 CodeLens**: "Run" and "Debug" shortcuts appear directly in your Python files—even in **Untitled** buffers or **Git Diffs**!
+- **🔍 Smart Discovery**: Automatically detects tests, including **Async Tests** (`async def`). View your suite hierarchically by app, file, class, and method.
+- **⚡ Fast Execution**: Optimized runner with **native tree icons** and reduced overhead.
+- **▶️ One-Click Run**: execute individual methods, classes, files, or the entire suite instantly.
+- **🐞 Zero-Config Debugging**: Click the debug icon next to any test to start a session. We handle `launch.json` for you.
+- **🔎 Instant Search**: integrated "Search Tests" command to jump to any test in your large codebase.
+- **⚙️ Test Profiles**: Switch between different run configurations (e.g., `Fast` with `--failfast`, `CI` with `--keepdb`) on the fly.
+- **📦 Native Experience**: Uses VS Code's native file icons and themes for a seamless look.
+- **📝 CodeLens**: "Run" and "Debug" shortcuts appear directly in your Python files—even in **Untitled** buffers or **Git Diffs**!
 
 ## 📦 Installation
 
@@ -52,6 +52,7 @@
 <a href="https://open-vsx.org/extension/viseshagarwal/django-test-manager">Get it from Open VSX</a>
 
 **Via VSIX (Manual):**
+
 1. Download the latest `.vsix` release from the GitHub releases page.
 2. In VS Code, run the command `Extensions: Install from VSIX...`.
 3. Select the downloaded file.
@@ -67,61 +68,70 @@
 
 Configure the extension via the **Settings (Gear Icon)** or `settings.json`:
 
-| Setting | Default | Description |
-| :--- | :--- | :--- |
-| `pythonPath` | `python3` | Path to your Python interpreter (auto-detects venv). |
-| `managePyPath` | `manage.py` | Relative path to `manage.py`. |
-| `testFilePattern` | `**/*test*.py` | Glob pattern for finding test files. |
-| `testMethodPattern` | `test_` | Prefix for identifying test methods. |
-| `activeProfile` | `Default` | Currently active test argument profile. |
+| Setting                | Default                                                     | Description                                                                                                                 |
+| :--------------------- | :---------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
+| `pythonPath`           | `python3`                                                   | Path to your Python interpreter (auto-detects venv).                                                                        |
+| `managePyPath`         | `manage.py`                                                 | Path to `manage.py`. Supports relative paths, absolute paths, or `${workspaceFolder}/path/to/manage.py`.                    |
+| `projectRoot`          | `""`                                                        | Root path of the Django project. If empty, uses workspace root. Can be absolute or relative to workspace root.              |
+| `testFilePattern`      | `**/{tests/**/*.py,test.py,tests.py}`                       | Glob pattern for finding test files. Default finds files in `tests` directory or files named `test.py`/`tests.py`.          |
+| `testMethodPattern`    | `test_`                                                     | Prefix for identifying test methods (e.g., `test_`). Only methods with this prefix are detected.                            |
+| `envFilePath`          | `.env`                                                      | Path to `.env` file. Supports relative paths, absolute paths, or `${workspaceFolder}/.env`. Set to empty string to disable. |
+| `environmentVariables` | `{}`                                                        | Environment variables to set when running tests (object with key-value pairs).                                              |
+| `activeProfile`        | `Default`                                                   | Currently active test argument profile. Default profile runs tests sequentially.                                            |
+| `testProfiles`         | `{Default: [], Fast: [...], Parallel: [...], Clean: [...]}` | Define test profiles with specific arguments. Default runs sequentially, Parallel/Fast run in parallel.                     |
 
 ## ⌨️ Commands
 
-| Command | Description |
-| :--- | :--- |
-| `Django Test Manager: Search Tests` | Quick-pick menu to find and run any test. |
-| `Django Test Manager: Run Failed Tests` | Smart re-run of only the tests that failed. |
-| `Django Test Manager: Cancel Tests` | Instantly stop the current test run. |
-| `Django Test Manager: Select Profile` | Switch between `Default`, `Fast`, `Clean`, etc. |
+| Command                                 | Description                                     |
+| :-------------------------------------- | :---------------------------------------------- |
+| `Django Test Manager: Search Tests`     | Quick-pick menu to find and run any test.       |
+| `Django Test Manager: Run Failed Tests` | Smart re-run of only the tests that failed.     |
+| `Django Test Manager: Cancel Tests`     | Instantly stop the current test run.            |
+| `Django Test Manager: Select Profile`   | Switch between `Default`, `Fast`, `Clean`, etc. |
 
 ## 🤝 Contributing
 
 We love contributions! Here is how you can set up the project locally:
 
 1.  **Clone the repository**:
+
     ```bash
     git clone https://github.com/viseshagarwal/django-test-manager.git
     cd django-test-manager
     ```
 
 2.  **Install dependencies**:
+
     ```bash
     npm install
     ```
 
 3.  **Run the Extension**:
-    *   Open the folder in **VS Code**.
-    *   Press `F5` to start debugging.
-    *   This will open a new VS Code window (Extension Host) with the extension loaded.
+
+    - Open the folder in **VS Code**.
+    - Press `F5` to start debugging.
+    - This will open a new VS Code window (Extension Host) with the extension loaded.
 
 4.  **Submit a Pull Request**:
-    *   Make your changes.
-    *   Run `npm run compile` to ensure everything builds.
-    *   Push your changes and open a PR on GitHub.
+    - Make your changes.
+    - Run `npm run compile` to ensure everything builds.
+    - Push your changes and open a PR on GitHub.
 
 ## 📦 Release Notes
 
 ### 0.2.2
-*   **New**: Added full support for **Async Tests** (`async def`).
-*   **New**: Improved status bar performance with smart debouncing (no more crashes on large suites!).
-*   **New**: Added **Test Profiles** support.
-*   **Improved**: Tree view now respects your **Active File Icon Theme**.
-*   **Improved**: CodeLenses now appear in **new/untitled files** and **Git Diff** views.
-*   **Fixed**: Resolved issues with large output buffers causing extension freeze.
+
+- **New**: Support for loading environment variables from `.env` files via `envFilePath` configuration.
+- **New**: Support for `projectRoot` configuration to specify custom project root path.
+- **New**: Support for absolute paths and variable substitution (`${workspaceFolder}`) in `managePyPath` and `envFilePath`.
+- **Improved**: Test discovery now only finds tests in `tests` directory/package or files named `test.py`/`tests.py`.
+- **Improved**: Only detects test classes starting with `Test` (e.g., `TestCase`, `TestMyClass`).
+- **Improved**: Default test profile runs tests sequentially for reliable results. Parallel execution available via profiles.
 
 ### 0.2.0 - 0.2.1
-*   Added Configuration Panel and Search.
-*   Improved argument handling and performance.
+
+- Added Configuration Panel and Search.
+- Improved argument handling and performance.
 
 ---
 
