@@ -1,9 +1,10 @@
 # Release Workflow - Publishes to VS Code Marketplace and Open VSX
-# Triggered when a PR is merged to main
+# Triggered manually (by owner only) or when a PR is merged to main with package.json changes
 
 name: Release
 
 on:
+  workflow_dispatch: # Allows manual triggering from GitHub UI
   push:
     branches: [main]
     paths:
@@ -13,8 +14,12 @@ jobs:
   publish:
     name: Publish Extension
     runs-on: ubuntu-latest
-    # Only run if this is a version bump commit (not just any package.json change)
-    if: contains(github.event.head_commit.message, 'version') || contains(github.event.head_commit.message, 'release') || contains(github.event.head_commit.message, 'bump')
+    environment: deploy # Requires approval from environment reviewers
+    # Manual dispatch: only repo owner can trigger
+    # Push: only when commit message contains version/release/bump
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.actor == 'viseshagarwal') ||
+      (github.event_name == 'push' && (contains(github.event.head_commit.message, 'version') || contains(github.event.head_commit.message, 'release') || contains(github.event.head_commit.message, 'bump')))
 
     steps:
       - name: Checkout code
