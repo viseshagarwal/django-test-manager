@@ -273,13 +273,11 @@ export class TestRunner {
         const activeProfile = config.get<string>("activeProfile") || "Default";
         const profiles =
             config.get<{ [key: string]: string[] }>("testProfiles") || {};
-        // Get arguments from the new configuration page (string array)
-        const configArgs = config.get<string[]>("testArguments") || [];
 
         // Combine profile args with config args (append config args to profile args)
         const profileArgs = profiles[activeProfile] || [];
-        const extraArgs = config.get<string[]>("testArguments") || [];
-        const rawTestArgs = [...profileArgs, ...extraArgs];
+        const testArguments = config.get<string[]>("testArguments") || [];
+        const rawTestArgs = [...profileArgs, ...testArguments];
 
         const testArgs: string[] = [];
         for (let i = 0; i < rawTestArgs.length; i++) {
@@ -375,9 +373,6 @@ export class TestRunner {
             "djangoTestManager.isRunning",
             true
         );
-        const config = vscode.workspace.getConfiguration("djangoTestManager");
-        const configEnv =
-            config.get<{ [key: string]: string }>("environmentVariables") || {};
 
         if (!this.djangoTerminal) {
             this.djangoTerminal = new DjangoTerminal();
@@ -703,27 +698,21 @@ export class TestRunner {
         }
     }
 
-    private generateCoverageReport() {
+    private async generateCoverageReport() {
         if (!this.coverageProvider) return;
 
         // Run coverage xml
         // We need to run this command in the same environment/cwd
         const config = vscode.workspace.getConfiguration("djangoTestManager");
         const coverageCommand = config.get<string>("coverageCommand") || "coverage";
-        // Need to construct command properly. python -m coverage xml OR coverage xml
 
         let cmd = coverageCommand;
         let args = ["xml"];
 
         // If we used pythonPath -m coverage, we should do the same here
         let pythonPath = config.get<string>("pythonPath") || "python3";
-        // ... (reuse venv detection logic? or just simple check)
-        // For simplicity, let's try to reuse the 'coverage' command logic.
 
-        // Actually, cleaner way:
-        // We just run `coverage xml` using the same shell/env.
-        // But if coverage is not in PATH (only in venv), we should use pythonPath -m coverage xml.
-
+        // Auto-detect venv
         const venvPath = path.join(this.workspaceRoot, ".venv", "bin", "python");
         const venvPath2 = path.join(this.workspaceRoot, "venv", "bin", "python");
         const fs = require("fs");
@@ -735,10 +724,8 @@ export class TestRunner {
             args = ["-m", "coverage", "xml"];
         }
 
-        // We run this using child_process.exec or spawn, but we don't need output stream parsing.
-        // Just run and wait.
-        const configEnv = config.get<{ [key: string]: string }>("environmentVariables") || {};
-        const env = { ...process.env, ...configEnv };
+        // Use merged environment variables for consistency
+        const env = await getMergedEnvironmentVariables(this.workspaceRoot);
 
         this.outputChannel.appendLine(`Generating coverage report: ${cmd} ${args.join(' ')}`);
 

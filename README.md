@@ -287,11 +287,14 @@ django-test-manager/
 
 ## 📦 Release Notes
 
-### 0.3.1 (Latest)
+### 0.3.2 (Latest)
+- 🔧 **FIX**: Status bar tooltip now shows correct statistics (Total, Success, Failed, Skipped) (#10)
+
+### 0.3.1
 - ✨ **New**: Support for loading environment variables from `.env` files via `envFilePath` configuration.
 - ✨ **New**: Support for `projectRoot` configuration to specify custom project root path.
 - ✨ **New**: Support for absolute paths and variable substitution (`${workspaceFolder}`) in `managePyPath` and `envFilePath`.
-- ⚡ **Improved**: Default test profile runs tests sequentially Without DB Reuse. for reliable results. Parallel execution available via profiles.
+- 🔧 **FIX**: Module not found errors when project root differs from workspace root (#3, #8)
 
 ### 0.3.0
 - ✨ **NEW**: Live Test Status - Real-time running/aborted indicators

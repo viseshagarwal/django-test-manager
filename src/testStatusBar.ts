@@ -78,6 +78,25 @@ export class TestStatusBar {
         if (aborted > 0) parts.push(`$(circle-slash) ${aborted}`);
 
         this.statusBarItem.text = `Django Tests: ${parts.join(' │ ')}`;
+
+        // Set tooltip with detailed statistics
+        const tooltipLines = [
+            `Total: ${total}`,
+            `Success: ${passed}`,
+            `Failed: ${failed}`,
+            `Skipped: ${skipped}`
+        ];
+        if (running > 0) {
+            tooltipLines.push(`Running: ${running}`);
+        }
+        if (pending > 0) {
+            tooltipLines.push(`Pending: ${pending}`);
+        }
+        if (aborted > 0) {
+            tooltipLines.push(`Aborted: ${aborted}`);
+        }
+        this.statusBarItem.tooltip = tooltipLines.join('\n');
+
         this.statusBarItem.show();
     }
 

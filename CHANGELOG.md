@@ -5,6 +5,33 @@ All notable changes to Django Test Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2025-12-20
+
+### Fixed
+
+- **Status bar tooltip now shows correct statistics** - Tooltip displays Total, Success, Failed, and Skipped counts (#10)
+
+### Improved
+
+- **Code cleanup in testRunner.ts** - Removed unused variables (`configArgs`, `configEnv`)
+- **Consistent environment variable handling** - `generateCoverageReport()` now uses `getMergedEnvironmentVariables()` for consistency with other methods, ensuring `.env` file variables are included in coverage generation
+
+---
+
+## [0.3.1] - 2025-12-18
+
+### Added
+
+- **Environment variables from `.env` files** - Load environment variables from a `.env` file via `envFilePath` configuration
+- **Custom project root** - New `projectRoot` configuration to specify custom project root paths
+- **Variable substitution in paths** - Support for `${workspaceFolder}` in `managePyPath` and `envFilePath`
+
+### Fixed
+
+- Module not found errors when project root differs from workspace root (#3, #8)
+
+---
+
 ## [0.3.0] - 2025-12-18
 
 ### Added

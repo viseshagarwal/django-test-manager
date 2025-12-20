@@ -2,7 +2,7 @@
   "name": "django-test-manager",
   "displayName": "Django Test Manager",
   "description": "Efficiently manage and run Django tests in VS Code",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "viseshagarwal",
   "author": {
     "name": "Visesh Agarwal"
