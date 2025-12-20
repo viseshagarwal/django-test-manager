@@ -11,7 +11,7 @@ export class DjangoTerminal implements vscode.Pseudoterminal {
 
     constructor() { }
 
-    open(initialDimensions: vscode.TerminalDimensions | undefined): void {
+    open(_initialDimensions: vscode.TerminalDimensions | undefined): void {
         this.writeEmitter.fire('Django Test Terminal Ready\r\n');
     }
 

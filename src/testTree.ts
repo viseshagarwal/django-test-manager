@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "path";
 import { TestDiscovery, TestNode } from "./testDiscovery";
 import { TestStateManager } from "./testStateManager";
 
@@ -103,7 +102,7 @@ export class TestItem extends vscode.TreeItem {
 				: vscode.TreeItemCollapsibleState.None
 		);
 		// Use composite ID to avoid collisions between folders and files with same dotted path
-		this.id = `${node.dottedPath}|${node.type}` || node.name;
+		this.id = node.dottedPath ? `${node.dottedPath}|${node.type}` : node.name;
 		this.contextValue = node.type;
 
 		if (node.uri) {

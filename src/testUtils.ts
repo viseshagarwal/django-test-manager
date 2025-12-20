@@ -254,7 +254,7 @@ export function resolvePath(pathValue: string, workspaceRoot: string, defaultPat
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || vscode.workspace.rootPath || workspaceRoot;
 
     // Replace ${workspaceFolder} variable
-    let resolvedPath = pathValue.replace(/\$\{workspaceFolder\}/g, workspaceFolder);
+    const resolvedPath = pathValue.replace(/\$\{workspaceFolder\}/g, workspaceFolder);
 
     // If it's already an absolute path, return it as-is
     if (path.isAbsolute(resolvedPath)) {

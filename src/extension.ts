@@ -61,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize Test History
     const testHistoryManager = TestHistoryManager.getInstance(context);
-    const testHistoryTreeProvider = new TestHistoryTreeProvider(testHistoryManager);
+    const _testHistoryTreeProvider = new TestHistoryTreeProvider(testHistoryManager);
 
     // Initialize VS Code Native Test Controller (integrates with built-in Test Explorer)
     const nativeTestController = new NativeTestController(resolvedWorkspaceRoot, testDiscovery);
@@ -92,7 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             const config = vscode.workspace.getConfiguration('djangoTestManager');
-            const pythonPath = config.get<string>('pythonPath') || 'python';
+            const _pythonPath = config.get<string>('pythonPath') || 'python';
             const managePyPathConfig = config.get<string>('managePyPath') || 'manage.py';
             const managePyPath = resolvePath(managePyPathConfig, resolvedWorkspaceRoot, 'manage.py');
             const env = await getMergedEnvironmentVariables(resolvedWorkspaceRoot);
@@ -189,7 +189,7 @@ export function activate(context: vscode.ExtensionContext) {
                             // Our provider returns TestItem, but getTreeItem returns TestItem.
                             // However, createTreeView is typed with <TestItem>.
                             await treeView.reveal(item, { expand: true, select: false, focus: false });
-                        } catch (e) {
+                        } catch {
                             // Ignore
                         }
                         // Recurse
@@ -514,7 +514,7 @@ function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (.
 /**
  * Get the test at the current cursor position
  */
-async function getTestAtCursor(workspaceRoot: string): Promise<TestNode | null> {
+async function getTestAtCursor(_workspaceRoot: string): Promise<TestNode | null> {
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.languageId !== 'python') {
         vscode.window.showErrorMessage('No active Python file found.');

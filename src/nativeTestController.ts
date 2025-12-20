@@ -54,7 +54,7 @@ export class NativeTestController {
         };
 
         // Refresh button
-        this.controller.refreshHandler = async (token) => {
+        this.controller.refreshHandler = async (_token) => {
             await this.discoverAllTests();
         };
     }
@@ -79,7 +79,7 @@ export class NativeTestController {
     /**
      * Create a VS Code TestItem from a TestNode
      */
-    private createTestItem(node: TestNode, parent?: vscode.TestItem): vscode.TestItem {
+    private createTestItem(node: TestNode, _parent?: vscode.TestItem): vscode.TestItem {
         const id = node.dottedPath || node.name;
         const uri = node.uri;
 
@@ -118,7 +118,7 @@ export class NativeTestController {
     /**
      * Resolve children of a test item
      */
-    private async resolveTestItem(item: vscode.TestItem): Promise<void> {
+    private async resolveTestItem(_item: vscode.TestItem): Promise<void> {
         // Children are already resolved during creation
         // This could be used for lazy loading in the future
     }
