@@ -171,9 +171,13 @@ Configure the extension in **Settings** (`Cmd+,` / `Ctrl+,`) or `settings.json`:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `djangoTestManager.pythonPath` | `python3` | Path to Python interpreter (auto-detects venv) |
-| `djangoTestManager.managePyPath` | `manage.py` | Path to manage.py |
-| `djangoTestManager.testFilePattern` | `**/*test*.py` | Glob pattern for test files |
+| `djangoTestManager.managePyPath` | `manage.py` | Path to `manage.py`. Supports relative paths, absolute paths, or `${workspaceFolder}/path/to/manage.py`.                    |
+| `djangoTestManager.testFilePattern` | `**/{tests/**/*.py,test.py,tests.py}` | Glob pattern for test files |
 | `djangoTestManager.testMethodPattern` | `test_` | Prefix for test methods |
+| `djangoTestManager.projectRoot`          | `""`                                                        | Root path of the Django project.        |
+| `environmentVariables` | `{}`                                                        | Environment variables to set when running tests (object with key-value pairs).                                              |
+| `djangoTestManager.envFilePath`          | `.env`                                                      | Path to `.env` file. Supports relative paths, absolute paths, or `${workspaceFolder}/.env`. Set to empty string to disable. |
+| `djangoTestManager.testArguments`.       | `["--keepdb" ...]` | Pass Required Test Arguments  |
 
 ### Test Profiles
 
@@ -185,7 +189,7 @@ Configure the extension in **Settings** (`Cmd+,` / `Ctrl+,`) or `settings.json`:
 **Default Profiles:**
 ```json
 {
-  "Default": ["--keepdb", "--parallel"],
+  "Default": [],
   "Fast": ["--keepdb", "--failfast", "--parallel"],
   "Clean": ["--noinput"]
 }
@@ -283,7 +287,13 @@ django-test-manager/
 
 ## 📦 Release Notes
 
-### 0.3.0 (Latest)
+### 0.3.1 (Latest)
+- ✨ **New**: Support for loading environment variables from `.env` files via `envFilePath` configuration.
+- ✨ **New**: Support for `projectRoot` configuration to specify custom project root path.
+- ✨ **New**: Support for absolute paths and variable substitution (`${workspaceFolder}`) in `managePyPath` and `envFilePath`.
+- ⚡ **Improved**: Default test profile runs tests sequentially Without DB Reuse. for reliable results. Parallel execution available via profiles.
+
+### 0.3.0
 - ✨ **NEW**: Live Test Status - Real-time running/aborted indicators
 - ✨ **NEW**: Watch Mode - Auto-run tests on file changes
 - ✨ **NEW**: Test History & Analytics dashboard

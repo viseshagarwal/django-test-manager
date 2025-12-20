@@ -2,7 +2,7 @@
   "name": "django-test-manager",
   "displayName": "Django Test Manager",
   "description": "Efficiently manage and run Django tests in VS Code",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "viseshagarwal",
   "author": {
     "name": "Visesh Agarwal"
@@ -265,12 +265,22 @@
         "djangoTestManager.managePyPath": {
           "type": "string",
           "default": "manage.py",
-          "description": "Path to manage.py file"
+          "description": "Path to manage.py file. Supports relative paths (relative to projectRoot), absolute paths, or variable substitution like ${workspaceFolder}/path/to/manage.py"
         },
         "djangoTestManager.testCommandTemplate": {
           "type": "string",
           "default": "${pythonPath} ${managePyPath} test ${testPath} ${testArguments}",
           "description": "Template for the test command. Variables: ${pythonPath}, ${managePyPath}, ${testPath}, ${testArguments}"
+        },
+        "djangoTestManager.envFilePath": {
+          "type": "string",
+          "default": ".env",
+          "description": "Path to .env file. Supports relative paths (relative to projectRoot), absolute paths, or variable substitution like ${workspaceFolder}/.env. Set to empty string to disable .env file loading."
+        },
+        "djangoTestManager.projectRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Root path of the Django project. If empty, uses workspace root. Can be absolute or relative to workspace root."
         },
         "djangoTestManager.testArguments": {
           "type": "array",
@@ -285,10 +295,7 @@
         "djangoTestManager.testProfiles": {
           "type": "object",
           "default": {
-            "Default": [
-              "--keepdb",
-              "--parallel"
-            ],
+            "Default": [],
             "Fast": [
               "--keepdb",
               "--failfast",
@@ -298,7 +305,7 @@
               "--noinput"
             ]
           },
-          "description": "Define test profiles with specific arguments"
+          "description": "Define test profiles with specific arguments. Default profile runs tests sequentially. Use Parallel or Fast profiles for parallel execution."
         },
         "djangoTestManager.activeProfile": {
           "type": "string",

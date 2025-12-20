@@ -9,7 +9,7 @@ import { TestDecorationProvider } from './testDecorations';
 import { TestStatusBar } from './testStatusBar';
 import { TestStateManager } from './testStateManager';
 import { CoverageProvider } from './coverageProvider';
-import { initTestUtilsCache } from './testUtils';
+import { getMergedEnvironmentVariables, initTestUtilsCache, resolvePath } from './testUtils';
 import { WatchModeManager } from './watchMode';
 import { TestHistoryManager, TestHistoryTreeProvider } from './testHistory';
 import { isTestClassFromLine } from './testUtils';
@@ -18,7 +18,7 @@ import { NativeTestController } from './nativeTestController';
 export function activate(context: vscode.ExtensionContext) {
     console.log('Django Test Manager is now active!');
 
-    const workspaceRoot = vscode.workspace.rootPath;
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || vscode.workspace.rootPath;
     if (!workspaceRoot) {
         vscode.window.showErrorMessage('No workspace folder opened. Django Test Manager cannot activate.');
         return;
@@ -27,9 +27,19 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize performance caches
     context.subscriptions.push(initTestUtilsCache());
     initCodeLensCache(context);
+    const config = vscode.workspace.getConfiguration('djangoTestManager');
+    let resolvedWorkspaceRoot = config.get<string>('projectRoot') ?? '';
 
-    const testDiscovery = new TestDiscovery(workspaceRoot);
-    const testTreeDataProvider = new TestTreeDataProvider(workspaceRoot, testDiscovery);
+    // If projectRoot config is empty, use workspace root
+    if (!resolvedWorkspaceRoot) {
+        resolvedWorkspaceRoot = workspaceRoot;
+    } else if (!path.isAbsolute(resolvedWorkspaceRoot)) {
+        // If relative, resolve it relative to workspace root
+        resolvedWorkspaceRoot = path.resolve(workspaceRoot, resolvedWorkspaceRoot);
+    }
+
+    const testDiscovery = new TestDiscovery(resolvedWorkspaceRoot);
+    const testTreeDataProvider = new TestTreeDataProvider(resolvedWorkspaceRoot, testDiscovery);
 
     // Use createTreeView to get access to the view instance
     const treeView = vscode.window.createTreeView('djangoTestExplorer', {
@@ -43,10 +53,10 @@ export function activate(context: vscode.ExtensionContext) {
     const coverageProvider = new CoverageProvider(workspaceRoot);
     // Load existing coverage if available
     coverageProvider.loadCoverage();
-    const testRunner = new TestRunner(workspaceRoot, testTreeDataProvider, coverageProvider);
+    const testRunner = new TestRunner(resolvedWorkspaceRoot, testTreeDataProvider, coverageProvider);
 
     // Initialize Watch Mode
-    const watchModeManager = new WatchModeManager(workspaceRoot, testRunner);
+    const watchModeManager = new WatchModeManager(resolvedWorkspaceRoot, testRunner);
     context.subscriptions.push({ dispose: () => watchModeManager.dispose() });
 
     // Initialize Test History
@@ -54,7 +64,7 @@ export function activate(context: vscode.ExtensionContext) {
     const testHistoryTreeProvider = new TestHistoryTreeProvider(testHistoryManager);
 
     // Initialize VS Code Native Test Controller (integrates with built-in Test Explorer)
-    const nativeTestController = new NativeTestController(workspaceRoot, testDiscovery);
+    const nativeTestController = new NativeTestController(resolvedWorkspaceRoot, testDiscovery);
     context.subscriptions.push({ dispose: () => nativeTestController.dispose() });
 
     // Discover tests for native controller
@@ -83,8 +93,9 @@ export function activate(context: vscode.ExtensionContext) {
 
             const config = vscode.workspace.getConfiguration('djangoTestManager');
             const pythonPath = config.get<string>('pythonPath') || 'python';
-            const managePyPath = config.get<string>('managePyPath') || 'manage.py';
-            const env = config.get<{ [key: string]: string }>('environmentVariables') || {};
+            const managePyPathConfig = config.get<string>('managePyPath') || 'manage.py';
+            const managePyPath = resolvePath(managePyPathConfig, resolvedWorkspaceRoot, 'manage.py');
+            const env = await getMergedEnvironmentVariables(resolvedWorkspaceRoot);
             const rawTestArgs = config.get<string[]>('testArguments') || [];
 
             // Filter out arguments that interfere with debugging
@@ -103,11 +114,10 @@ export function activate(context: vscode.ExtensionContext) {
                 testArgs.push(arg);
             }
 
-            const managePyFull = path.join(workspaceRoot, managePyPath);
             try {
-                await vscode.workspace.fs.stat(vscode.Uri.file(managePyFull));
+                await vscode.workspace.fs.stat(vscode.Uri.file(managePyPath));
             } catch {
-                vscode.window.showErrorMessage(`Cannot find manage.py at ${managePyFull}. Please check your configuration.`);
+                vscode.window.showErrorMessage(`Cannot find manage.py at ${managePyPath}. Please check your configuration.`);
                 return;
             }
 
@@ -116,14 +126,14 @@ export function activate(context: vscode.ExtensionContext) {
                 name: debugConfigName,
                 type: 'debugpy',
                 request: 'launch',
-                program: path.join(workspaceRoot, managePyPath),
+                program: managePyPath,
                 args: ['test', node.dottedPath, '--noinput', ...testArgs],
                 console: 'integratedTerminal',
                 env: env,
                 justMyCode: false,
                 subProcess: true,
                 django: true,
-                cwd: workspaceRoot
+                cwd: resolvedWorkspaceRoot
             };
             // Start debugging using the configuration directly (more reliable than named config)
             await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], debugConfig);
@@ -224,9 +234,17 @@ export function activate(context: vscode.ExtensionContext) {
 
             const uri = editor.document.uri;
             const fileName = path.basename(uri.fsPath);
+            const EXACT_TEST_FILES = new Set([
+                'test.py',
+                'tests.py',
+            ]);
 
+            const isTestFile =
+                EXACT_TEST_FILES.has(fileName) ||
+                fileName.startsWith('test_') ||
+                fileName.endsWith('_test.py');
             // If it's already a test file, just run it
-            if (fileName.startsWith('test_') || fileName.endsWith('_test.py')) {
+            if (isTestFile) {
                 vscode.commands.executeCommand('django-test-manager.runCurrentFile');
                 return;
             }
@@ -235,7 +253,7 @@ export function activate(context: vscode.ExtensionContext) {
             const testNames = [`test_${nameWithoutExt}.py`, `${nameWithoutExt}_test.py`];
 
             // Search for test files
-            const files = await vscode.workspace.findFiles(`**/{${testNames.join(',')}}`, '**/node_modules/**', 10);
+            const files = await vscode.workspace.findFiles(`**/{tests/**/{${testNames.join(',')}},test.py,tests.py}`, '**/node_modules/**', 10);
 
             if (files.length === 0) {
                 vscode.window.showErrorMessage(`No related test file found for ${fileName}.`);
@@ -435,7 +453,7 @@ export function activate(context: vscode.ExtensionContext) {
                 { language: 'python', scheme: 'file' },
                 { language: 'python', scheme: 'untitled' }
             ],
-            new DjangoTestCodeLensProvider(workspaceRoot)
+            new DjangoTestCodeLensProvider(resolvedWorkspaceRoot)
         )
     );
 
