@@ -559,7 +559,7 @@ export class TestRunner {
     private static readonly ANSI_CODE_REGEX = /\u001b\[\d+m/g;
     private static readonly TEST_START_REGEX = /(\w+)\s+\(([\w.]+)\)/;
     private static readonly RESULT_REGEX = /\.\.\.\s+(ok|skipped|FAIL|ERROR)(?:\s+\(([\d.]+)s\))?/;
-    private static readonly SUMMARY_REGEX = /(FAIL|ERROR):\s+(\w+)\s+\((.+)\)/;
+    private static readonly SUMMARY_REGEX = /(FAIL|ERROR):\s+(\w+)\s+\((.+?)\)/;
     private static readonly SEPARATOR_LINE = '----------------------------------------------------------------------';
 
     private parseResults(node: TestNode, output: string) {
