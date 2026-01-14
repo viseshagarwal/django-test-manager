@@ -517,6 +517,22 @@ export class TestRunner {
             const stateManager = TestStateManager.getInstance();
             const currentStatus = stateManager.getStatus(node.dottedPath);
 
+            // If the test is still running when the process exits, it means we missed the result
+            // (e.g. parsing error) or the process crashed.
+            if (currentStatus === "running") {
+                if (success) {
+                    stateManager.setStatus(node.dottedPath, "passed");
+                } else {
+                    stateManager.setStatus(node.dottedPath, "failed");
+                    if (!stateManager.getFailureMessage(node.dottedPath)) {
+                        stateManager.setFailureMessage(
+                            node.dottedPath,
+                            "Test run terminated unexpectedly while this test was running."
+                        );
+                    }
+                }
+            }
+
             // Only update if still pending
             if (currentStatus === "pending") {
                 if (success) {
