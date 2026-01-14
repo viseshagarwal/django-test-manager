@@ -267,12 +267,12 @@ export class TestRunner {
         const enableCoverage = config.get<boolean>("enableCoverage") || false;
         const coverageCommand = config.get<string>("coverageCommand") || "coverage";
 
-        let finalPythonPath = pythonPath;
+        let finalPythonParts: string[] = [pythonPath];
         if (enableCoverage) {
             if (coverageCommand === 'coverage' && pythonPath.includes('bin/python')) {
-                finalPythonPath = `${pythonPath} -m coverage run --source=.`;
+                finalPythonParts = [pythonPath, "-m", "coverage", "run", "--source=."];
             } else {
-                finalPythonPath = `${coverageCommand} run --source=.`;
+                finalPythonParts = [...coverageCommand.split(' '), "run", "--source=."];
             }
         }
 
@@ -312,7 +312,7 @@ export class TestRunner {
         tokens.forEach(token => {
             if (token === '${pythonPath}') {
                 if (enableCoverage) {
-                    finalArgs.push(...finalPythonPath.split(' '));
+                    finalArgs.push(...finalPythonParts);
                 } else {
                     finalArgs.push(pythonPath);
                 }
@@ -516,6 +516,22 @@ export class TestRunner {
         if (node.dottedPath) {
             const stateManager = TestStateManager.getInstance();
             const currentStatus = stateManager.getStatus(node.dottedPath);
+
+            // If the test is still running when the process exits, it means we missed the result
+            // (e.g. parsing error) or the process crashed.
+            if (currentStatus === "running") {
+                if (success) {
+                    stateManager.setStatus(node.dottedPath, "passed");
+                } else {
+                    stateManager.setStatus(node.dottedPath, "failed");
+                    if (!stateManager.getFailureMessage(node.dottedPath)) {
+                        stateManager.setFailureMessage(
+                            node.dottedPath,
+                            "Test run terminated unexpectedly while this test was running."
+                        );
+                    }
+                }
+            }
 
             // Only update if still pending
             if (currentStatus === "pending") {
