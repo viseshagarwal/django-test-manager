@@ -267,12 +267,12 @@ export class TestRunner {
         const enableCoverage = config.get<boolean>("enableCoverage") || false;
         const coverageCommand = config.get<string>("coverageCommand") || "coverage";
 
-        let finalPythonPath = pythonPath;
+        let finalPythonParts: string[] = [pythonPath];
         if (enableCoverage) {
             if (coverageCommand === 'coverage' && pythonPath.includes('bin/python')) {
-                finalPythonPath = `${pythonPath} -m coverage run --source=.`;
+                finalPythonParts = [pythonPath, "-m", "coverage", "run", "--source=."];
             } else {
-                finalPythonPath = `${coverageCommand} run --source=.`;
+                finalPythonParts = [...coverageCommand.split(' '), "run", "--source=."];
             }
         }
 
@@ -312,7 +312,7 @@ export class TestRunner {
         tokens.forEach(token => {
             if (token === '${pythonPath}') {
                 if (enableCoverage) {
-                    finalArgs.push(...finalPythonPath.split(' '));
+                    finalArgs.push(...finalPythonParts);
                 } else {
                     finalArgs.push(pythonPath);
                 }
