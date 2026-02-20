@@ -497,7 +497,8 @@ export function activate(context: vscode.ExtensionContext) {
     updateDecorations(vscode.window.activeTextEditor);
 
     // Auto-discover tests on file changes with debounce
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*test*.py');
+    const filePattern = vscode.workspace.getConfiguration('djangoTestManager').get<string>('testFilePattern') || '**/*test*.py';
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(workspaceRoot, filePattern));
     const debouncedUpdate = debounce((uri: vscode.Uri) => testTreeDataProvider.updateFile(uri), 500);
 
     watcher.onDidCreate((uri) => debouncedUpdate(uri));

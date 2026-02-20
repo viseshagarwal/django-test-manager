@@ -223,7 +223,7 @@ export class WatchModeManager {
                 const dirPath = path.dirname(filePath);
                 const testFiles = await vscode.workspace.findFiles(
                     `**/{${testFileNames.join(',')}}`,
-                    '**/node_modules/**',
+                    '**/{node_modules,venv,.venv,env,.env,__pycache__,.git,.tox,dist,build}/**',
                     10
                 );
 
