@@ -154,6 +154,12 @@
         "title": "View Test History",
         "icon": "$(history)",
         "tooltip": "View history of test runs"
+      },
+      {
+        "command": "django-test-manager.triageFailedTests",
+        "title": "Triage Failed Tests",
+        "icon": "$(bug)",
+        "tooltip": "Triage and group failed tests by exception"
       }
     ],
     "viewsContainers": {
@@ -205,6 +211,11 @@
           "command": "django-test-manager.runFailedTests",
           "when": "view == djangoTestExplorer",
           "group": "navigation@2"
+        },
+        {
+          "command": "django-test-manager.triageFailedTests",
+          "when": "view == djangoTestExplorer",
+          "group": "navigation@3"
         },
         {
           "command": "django-test-manager.collapseAll",

@@ -14,6 +14,7 @@ import { WatchModeManager } from './watchMode';
 import { TestHistoryManager, TestHistoryTreeProvider } from './testHistory';
 import { isTestClassFromLine } from './testUtils';
 import { NativeTestController } from './nativeTestController';
+import { TriagePanel } from './triagePanel';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Django Test Manager is now active!');
@@ -423,6 +424,11 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('django-test-manager.clearTestHistory', () => {
             testHistoryManager.clearHistory();
             vscode.window.showInformationMessage('Test history cleared.');
+        }),
+
+        // Triage Failed tests command
+        vscode.commands.registerCommand('django-test-manager.triageFailedTests', () => {
+            TriagePanel.createOrShow(context.extensionUri);
         }),
 
         vscode.commands.registerCommand('django-test-manager.exportTestHistory', async () => {

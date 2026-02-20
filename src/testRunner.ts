@@ -719,6 +719,12 @@ export class TestRunner {
         if (hasDiff) {
             TestStateManager.getInstance().setDiff(testPath, expected, actual);
         }
+
+        // Store the full failure message/traceback
+        const fullMessage = lines.join('\n').trim();
+        if (fullMessage) {
+            TestStateManager.getInstance().setFailureMessage(testPath, fullMessage);
+        }
     }
 
     private async generateCoverageReport() {
