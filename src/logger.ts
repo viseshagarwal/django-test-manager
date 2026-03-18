@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as https from 'https';
+import * as http from 'http';
+import { URL } from 'url';
 
 export class Logger {
     private static instance: Logger;
@@ -41,7 +44,58 @@ export class Logger {
 
     private log(level: string, message: string): void {
         const timestamp = new Date().toISOString();
-        this.outputChannel.appendLine(`[${timestamp}] [${level}] ${message}`);
+        const formattedMessage = `[${timestamp}] [${level}] ${message}`;
+        this.outputChannel.appendLine(formattedMessage);
+
+        this.sendToCloud(level, message, timestamp);
+    }
+
+    private sendToCloud(level: string, message: string, timestamp: string): void {
+        const config = vscode.workspace.getConfiguration('djangoTestManager');
+        const cloudLogEnable = config.get<boolean>('cloudLogEnable') || false;
+        const cloudLogEndpoint = config.get<string>('cloudLogEndpoint') || '';
+
+        if (!cloudLogEnable || !cloudLogEndpoint) {
+            return;
+        }
+
+        try {
+            const url = new URL(cloudLogEndpoint);
+            const payload = JSON.stringify({
+                timestamp,
+                level,
+                message,
+                source: 'django-test-manager'
+            });
+
+            const options = {
+                hostname: url.hostname,
+                path: url.pathname + url.search,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(payload)
+                }
+            };
+
+            const reqModule = url.protocol === 'https:' ? https : http;
+
+            const req = reqModule.request(options, (res) => {
+                // Ignore response, we just want to send the log
+                res.on('data', () => {});
+                res.on('end', () => {});
+            });
+
+            req.on('error', (_e) => {
+                // Silently ignore cloud logging errors to avoid spamming the local log
+                // if the cloud endpoint is down.
+            });
+
+            req.write(payload);
+            req.end();
+        } catch {
+            // Silently ignore URL parsing errors, etc.
+        }
     }
 }
 

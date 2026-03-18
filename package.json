@@ -385,6 +385,16 @@
           "type": "number",
           "default": 50,
           "description": "Maximum number of test sessions to keep in history."
+        },
+        "djangoTestManager.cloudLogEnable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable sending logs to a cloud service (e.g. Firebase Realtime Database)."
+        },
+        "djangoTestManager.cloudLogEndpoint": {
+          "type": "string",
+          "default": "",
+          "description": "The URL endpoint to send logs via POST request (e.g. https://<project-id>.firebaseio.com/logs.json)."
         }
       }
     },
