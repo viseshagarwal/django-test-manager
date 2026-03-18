@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from './logger';
 
 export class CoverageProvider {
     private coveredDecorationType: vscode.TextEditorDecorationType;
@@ -33,7 +34,7 @@ export class CoverageProvider {
         // Read coverage.xml
         const coveragePath = path.join(this.workspaceRoot, 'coverage.xml');
         if (!fs.existsSync(coveragePath)) {
-            console.log('No coverage.xml found');
+            logger.info('No coverage.xml found');
             return;
         }
 
@@ -46,7 +47,7 @@ export class CoverageProvider {
                 this.updateDecorations(editor);
             });
         } catch (e) {
-            console.error('Error loading coverage:', e);
+            logger.error('Error loading coverage:', e);
         }
     }
 

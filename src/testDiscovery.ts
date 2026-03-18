@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { TestStateManager } from './testStateManager';
 import { isTestClass } from './testUtils';
+import { logger } from './logger';
 
 export interface TestNode {
     name: string;
@@ -185,7 +186,7 @@ export class TestDiscovery {
 
             return fileNode.children && fileNode.children.length > 0 ? fileNode : null;
         } catch (e) {
-            console.error(`Error parsing file ${uri.fsPath}:`, e);
+            logger.error(`Error parsing file ${uri.fsPath}:`, e);
             return null;
         }
     }

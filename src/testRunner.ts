@@ -8,6 +8,7 @@ import { DjangoTerminal } from "./djangoTerminal";
 import { CoverageProvider } from "./coverageProvider";
 import { TestHistoryManager } from "./testHistory";
 import { getMergedEnvironmentVariables, resolvePath } from "./testUtils";
+import { logger } from './logger';
 
 export class TestRunner {
     private outputChannel: vscode.OutputChannel;
@@ -492,7 +493,7 @@ export class TestRunner {
                 this.parseResults(nodeToWatch, completeLines);
             }
         } catch (e) {
-            console.error("Error parsing test output:", e);
+            logger.error("Error parsing test output:", e);
         } finally {
             this.isParsing = false;
         }
