@@ -154,6 +154,12 @@
         "title": "View Test History",
         "icon": "$(history)",
         "tooltip": "View history of test runs"
+      },
+      {
+        "command": "django-test-manager.showLogs",
+        "title": "Show Extension Logs",
+        "icon": "$(output)",
+        "tooltip": "Show Django Test Manager logs"
       }
     ],
     "viewsContainers": {
@@ -215,6 +221,11 @@
           "command": "django-test-manager.selectProfile",
           "when": "view == djangoTestExplorer",
           "group": "navigation@5"
+        },
+        {
+          "command": "django-test-manager.showLogs",
+          "when": "view == djangoTestExplorer",
+          "group": "navigation@6"
         }
       ],
       "view/item/context": [

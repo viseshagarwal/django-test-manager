@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { logger } from './logger';
 
 /**
  * Default known Django/Python test base classes
@@ -193,7 +194,7 @@ async function readEnvFile(envFilePath: string): Promise<{ [key: string]: string
             }
         }
     } catch (error) {
-        console.error(`Error reading .env file at ${envFilePath}:`, error);
+        logger.error(`Error reading .env file at ${envFilePath}:`, error);
     }
 
     return envVars;

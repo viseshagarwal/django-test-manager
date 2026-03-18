@@ -14,9 +14,10 @@ import { WatchModeManager } from './watchMode';
 import { TestHistoryManager, TestHistoryTreeProvider } from './testHistory';
 import { isTestClassFromLine } from './testUtils';
 import { NativeTestController } from './nativeTestController';
+import { logger } from './logger';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Django Test Manager is now active!');
+    logger.info('Django Test Manager is now active!');
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || vscode.workspace.rootPath;
     if (!workspaceRoot) {
@@ -444,6 +445,11 @@ export function activate(context: vscode.ExtensionContext) {
             if (testAtCursor) {
                 vscode.commands.executeCommand('django-test-manager.debugTest', testAtCursor);
             }
+        }),
+
+        // Show Logs command
+        vscode.commands.registerCommand('django-test-manager.showLogs', () => {
+            logger.show();
         })
     );
 
@@ -470,7 +476,7 @@ export function activate(context: vscode.ExtensionContext) {
                 decorationProvider.updateDecorations(editor, [node]);
             }
         } catch (e) {
-            console.error('Error updating decorations:', e);
+            logger.error('Error updating decorations:', e);
         }
     };
 
