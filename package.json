@@ -60,6 +60,24 @@
         "tooltip": "Debug this test"
       },
       {
+        "command": "django-test-manager.runSelectedTests",
+        "title": "Run Selected Tests",
+        "icon": "$(play)",
+        "tooltip": "Run all selected tests"
+      },
+      {
+        "command": "django-test-manager.copyTestCommand",
+        "title": "Copy Test Command",
+        "icon": "$(copy)",
+        "tooltip": "Copy Django test command for selected tests"
+      },
+      {
+        "command": "django-test-manager.previewTestCommand",
+        "title": "Preview Test Command",
+        "icon": "$(info)",
+        "tooltip": "Preview Django test command for selected tests"
+      },
+      {
         "command": "django-test-manager.copyPath",
         "title": "Copy Path",
         "icon": "$(copy)",
@@ -230,11 +248,18 @@
         },
         {
           "command": "django-test-manager.runTest",
-          "when": "view == djangoTestExplorer"
+          "when": "view == djangoTestExplorer && !djangoTestManager.hasMultipleSelection",
+          "group": "1_run@1"
+        },
+        {
+          "command": "django-test-manager.runSelectedTests",
+          "when": "view == djangoTestExplorer && djangoTestManager.hasMultipleSelection",
+          "group": "1_run@2"
         },
         {
           "command": "django-test-manager.debugTest",
-          "when": "view == djangoTestExplorer"
+          "when": "view == djangoTestExplorer && !djangoTestManager.hasMultipleSelection",
+          "group": "1_run@3"
         },
         {
           "command": "django-test-manager.copyPath",
@@ -243,7 +268,18 @@
         },
         {
           "command": "django-test-manager.copyPath",
-          "when": "view == djangoTestExplorer"
+          "when": "view == djangoTestExplorer && !djangoTestManager.hasMultipleSelection",
+          "group": "2_copy@1"
+        },
+        {
+          "command": "django-test-manager.copyTestCommand",
+          "when": "view == djangoTestExplorer && djangoTestManager.hasMultipleSelection",
+          "group": "2_copy@2"
+        },
+        {
+          "command": "django-test-manager.previewTestCommand",
+          "when": "view == djangoTestExplorer && djangoTestManager.hasMultipleSelection",
+          "group": "2_copy@3"
         }
       ],
       "editor/title": [

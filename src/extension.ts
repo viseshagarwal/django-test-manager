@@ -9,7 +9,7 @@ import { TestDecorationProvider } from './testDecorations';
 import { TestStatusBar } from './testStatusBar';
 import { TestStateManager } from './testStateManager';
 import { CoverageProvider } from './coverageProvider';
-import { getMergedEnvironmentVariables, initTestUtilsCache, resolvePath } from './testUtils';
+import { getMergedEnvironmentVariables, initTestUtilsCache, resolvePath, normalizeTestPaths } from './testUtils';
 import { WatchModeManager } from './watchMode';
 import { TestHistoryManager, TestHistoryTreeProvider } from './testHistory';
 import { isTestClassFromLine } from './testUtils';
@@ -43,8 +43,17 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Use createTreeView to get access to the view instance
     const treeView = vscode.window.createTreeView('djangoTestExplorer', {
-        treeDataProvider: testTreeDataProvider
+        treeDataProvider: testTreeDataProvider,
+        canSelectMany: true
     });
+
+    // Handle tree selection changes
+    context.subscriptions.push(
+        treeView.onDidChangeSelection(e => {
+            const hasMultipleSelection = e.selection.length > 1;
+            vscode.commands.executeCommand('setContext', 'djangoTestManager.hasMultipleSelection', hasMultipleSelection);
+        })
+    );
 
     // Status Bar
     const statusBar = new TestStatusBar();
@@ -83,6 +92,58 @@ export function activate(context: vscode.ExtensionContext) {
             } else if ((item as TestNode).dottedPath) {
                 testRunner.runInTerminal(item as TestNode);
             }
+        }),
+        vscode.commands.registerCommand('django-test-manager.runSelectedTests', (_item: TestItem, selectedItems?: TestItem[]) => {
+            const items = selectedItems && selectedItems.length > 0 ? selectedItems : treeView.selection;
+            if (!items || items.length === 0) {
+                vscode.window.showInformationMessage('No tests selected.');
+                return;
+            }
+
+            const paths = items.map(item => item.node.dottedPath).filter((p): p is string => p !== undefined);
+            const normalizedPaths = normalizeTestPaths(paths);
+
+            const nodesToRun = normalizedPaths.map(p => {
+                const item = items.find(i => i.node.dottedPath === p);
+                return item ? item.node : { name: p.split('.').pop() || p, type: 'folder', dottedPath: p } as TestNode;
+            });
+
+            if (nodesToRun.length > 0) {
+                testRunner.runInTerminal(nodesToRun);
+            }
+        }),
+        vscode.commands.registerCommand('django-test-manager.copyTestCommand', (_item: TestItem, selectedItems?: TestItem[]) => {
+            const items = selectedItems && selectedItems.length > 0 ? selectedItems : treeView.selection;
+            if (!items || items.length === 0) {
+                vscode.window.showInformationMessage('No tests selected.');
+                return;
+            }
+
+            const paths = items.map(item => item.node.dottedPath).filter((p): p is string => p !== undefined);
+            const normalizedPaths = normalizeTestPaths(paths);
+            const { cmd, args } = testRunner.buildTestCommandParts(normalizedPaths);
+
+            // Build display command string responsibly
+            const fullCmd = `${cmd} ${args.map((a: string) => a.includes(' ') ? `"${a}"` : a).join(' ')}`;
+
+            vscode.env.clipboard.writeText(fullCmd);
+            vscode.window.showInformationMessage('Test command copied to clipboard');
+        }),
+        vscode.commands.registerCommand('django-test-manager.previewTestCommand', (_item: TestItem, selectedItems?: TestItem[]) => {
+            const items = selectedItems && selectedItems.length > 0 ? selectedItems : treeView.selection;
+            if (!items || items.length === 0) {
+                vscode.window.showInformationMessage('No tests selected.');
+                return;
+            }
+
+            const paths = items.map(item => item.node.dottedPath).filter((p): p is string => p !== undefined);
+            const normalizedPaths = normalizeTestPaths(paths);
+            const { cmd, args } = testRunner.buildTestCommandParts(normalizedPaths);
+
+            // Build display command string responsibly
+            const fullCmd = `${cmd} ${args.map((a: string) => a.includes(' ') ? `"${a}"` : a).join(' ')}`;
+
+            vscode.window.showInformationMessage(`Command: ${fullCmd}`, { modal: true });
         }),
         vscode.commands.registerCommand('django-test-manager.debugTest', async (item: TestItem | TestNode) => {
             const node = item instanceof TestItem ? item.node : item;

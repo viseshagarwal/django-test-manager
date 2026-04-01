@@ -264,3 +264,29 @@ export function resolvePath(pathValue: string, workspaceRoot: string, defaultPat
     // Otherwise, resolve it relative to workspaceRoot
     return path.resolve(workspaceRoot, resolvedPath);
 }
+
+/**
+ * Normalizes and deduplicates a list of test dotted paths.
+ * If a path is a child of another path in the list, it is removed.
+ * Example: ['app1', 'app1.tests'] -> ['app1']
+ * @param paths Array of dotted paths to normalize
+ * @returns Deduplicated array of dotted paths
+ */
+export function normalizeTestPaths(paths: string[]): string[] {
+    if (!paths || paths.length === 0) return [];
+
+    // Sort paths by length so that shorter paths (parents) come first
+    const sortedPaths = [...paths].filter(p => p).sort((a, b) => a.length - b.length);
+    const normalized: string[] = [];
+
+    for (const p of sortedPaths) {
+        // Check if any existing path in normalized is a parent of p
+        // It's a parent if p starts with normalizedPath + '.'
+        const isChild = normalized.some(parent => p === parent || p.startsWith(`${parent}.`));
+        if (!isChild) {
+            normalized.push(p);
+        }
+    }
+
+    return normalized;
+}
