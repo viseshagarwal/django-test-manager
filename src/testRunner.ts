@@ -33,9 +33,11 @@ export class TestRunner {
         });
     }
 
-    async run(node: TestNode): Promise<void> {
-        const testPath = node.dottedPath;
-        if (!testPath) {
+    async run(node: TestNode | TestNode[]): Promise<void> {
+        const nodes = Array.isArray(node) ? node : [node];
+        const testPaths = nodes.map((n) => n.dottedPath).filter((p): p is string => p !== undefined && p !== null);
+
+        if (testPaths.length === 0) {
             vscode.window.showErrorMessage("Could not determine test path");
             return;
         }
@@ -44,11 +46,11 @@ export class TestRunner {
         TestStateManager.getInstance().clear();
 
         // Reset status
-        this.setNodeStatus(node, "pending");
+        nodes.forEach(n => this.setNodeStatus(n, "pending"));
         this.outputChannel.clear();
         this.outputChannel.show();
 
-        const { cmd, args } = this.buildTestCommandParts(testPath);
+        const { cmd, args } = this.buildTestCommandParts(testPaths);
 
         // Build display command string responsibly
         const fullCmd = `${cmd} ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`;
@@ -56,10 +58,12 @@ export class TestRunner {
 
         const env = await getMergedEnvironmentVariables(this.workspaceRoot);
 
+        const testName = nodes.length === 1 ? nodes[0].name : "Selected Tests";
+
         return vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: `Running tests for ${node.name}...`,
+                title: `Running tests for ${testName}...`,
                 cancellable: true,
             },
             (progress, token) => {
@@ -102,7 +106,13 @@ export class TestRunner {
                                 `\nProcess exited with code: ${code}`
                             );
                         }
-                        this.parseResults(node, buffer);
+                        const combinedNode: TestNode = {
+                            name: "Combined Tests",
+                            type: "folder",
+                            dottedPath: "",
+                            children: nodes
+                        };
+                        this.parseResults(combinedNode, buffer);
                         resolve();
                     });
 
@@ -163,9 +173,11 @@ export class TestRunner {
     private failureBlock: string[] = [];
     private testStartTimes: Map<string, number> = new Map();
 
-    async runInTerminal(node: TestNode): Promise<void> {
-        const testPath = node.dottedPath;
-        if (testPath === undefined || testPath === null) {
+    async runInTerminal(node: TestNode | TestNode[]): Promise<void> {
+        const nodes = Array.isArray(node) ? node : [node];
+        const testPaths = nodes.map((n) => n.dottedPath).filter((p): p is string => p !== undefined && p !== null);
+
+        if (testPaths.length === 0) {
             vscode.window.showErrorMessage("Could not determine test path");
             return;
         }
@@ -187,9 +199,9 @@ export class TestRunner {
             }
         };
 
-        let effectiveNode = node;
+        let effectiveNode: TestNode;
 
-        if (!node.dottedPath) {
+        if (nodes.length === 1 && !nodes[0].dottedPath) {
             // Run All case: Set everything to pending
             const roots = await this.treeDataProvider.getChildren();
             roots.forEach((rootItem) => setPendingRecursive(rootItem.node));
@@ -202,16 +214,26 @@ export class TestRunner {
                 children: roots.map((r) => r.node),
             };
         } else {
-            // Specific node case
-            const realNode = await this.treeDataProvider.findNode(node.dottedPath);
-            const nodeToUpdate = realNode || node;
-            setPendingRecursive(nodeToUpdate);
-            effectiveNode = nodeToUpdate;
+            // Specific node(s) case
+            const realNodes = await Promise.all(nodes.map(n => this.treeDataProvider.findNode(n.dottedPath!)));
+            const nodesToUpdate = realNodes.map((n, i) => n || nodes[i]);
+            nodesToUpdate.forEach(n => setPendingRecursive(n));
+
+            if (nodesToUpdate.length === 1) {
+                effectiveNode = nodesToUpdate[0];
+            } else {
+                effectiveNode = {
+                    name: "Selected Tests",
+                    type: "folder",
+                    dottedPath: "",
+                    children: nodesToUpdate
+                };
+            }
         }
 
         this.treeDataProvider.refresh();
 
-        const { cmd, args } = this.buildTestCommandParts(testPath);
+        const { cmd, args } = this.buildTestCommandParts(testPaths);
         await this.executeCommandInTerminal(cmd, args, effectiveNode);
     }
 
@@ -232,8 +254,7 @@ export class TestRunner {
         });
         this.treeDataProvider.refresh();
 
-        const testPaths = failedTests.join(" ");
-        const { cmd, args } = this.buildTestCommandParts(testPaths);
+        const { cmd, args } = this.buildTestCommandParts(failedTests);
 
         // Create a dummy node for the watcher
         const effectiveNode: TestNode = {
@@ -246,7 +267,7 @@ export class TestRunner {
         await this.executeCommandInTerminal(cmd, args, effectiveNode);
     }
 
-    private buildTestCommandParts(testPaths: string): { cmd: string, args: string[] } {
+    public buildTestCommandParts(testPaths: string[]): { cmd: string, args: string[] } {
         const config = vscode.workspace.getConfiguration("djangoTestManager");
         let pythonPath = config.get<string>("pythonPath") || "python3";
         const managePyPathConfig = config.get<string>("managePyPath") || "manage.py";
@@ -319,8 +340,9 @@ export class TestRunner {
             } else if (token === '${managePyPath}') {
                 finalArgs.push(managePyPath);
             } else if (token === '${testPath}') {
-                if (testPaths.trim().length > 0) {
-                    finalArgs.push(...testPaths.split(' '));
+                const validPaths = testPaths.filter(p => p.trim().length > 0);
+                if (validPaths.length > 0) {
+                    finalArgs.push(...validPaths);
                 }
             } else if (token === '${testArguments}') {
                 finalArgs.push(...testArgs);
