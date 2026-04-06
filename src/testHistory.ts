@@ -173,6 +173,14 @@ export class TestHistoryManager {
         return history.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     }
 
+    public getAverageTestDuration(dottedPath: string): number | undefined {
+        const history = this.getTestHistory(dottedPath);
+        if (history.length === 0) return undefined;
+
+        const total = history.reduce((sum, record) => sum + record.duration, 0);
+        return total / history.length;
+    }
+
     /**
      * Calculate flakiness for a test (percentage of times it failed/passed inconsistently)
      */

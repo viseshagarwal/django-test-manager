@@ -15,6 +15,10 @@ export class DjangoTerminal implements vscode.Pseudoterminal {
         this.writeEmitter.fire('Django Test Terminal Ready\r\n');
     }
 
+    public write(text: string): void {
+        this.writeEmitter.fire(text);
+    }
+
     close(): void {
         if (this.process) {
             this.process.kill();

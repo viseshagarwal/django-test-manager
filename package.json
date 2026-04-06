@@ -160,6 +160,30 @@
         "title": "Triage Failed Tests",
         "icon": "$(bug)",
         "tooltip": "Triage and group failed tests by exception"
+      },
+      {
+        "command": "django-test-manager.showNPlusOneResults",
+        "title": "N+1 Query Results",
+        "icon": "$(database)",
+        "tooltip": "Show N+1 query detection results"
+      },
+      {
+        "command": "django-test-manager.openFirstFailingTest",
+        "title": "Open First Failing Test",
+        "icon": "$(arrow-up)",
+        "tooltip": "Navigate to the first failing test"
+      },
+      {
+        "command": "django-test-manager.nextFailingTest",
+        "title": "Next Failing Test",
+        "icon": "$(arrow-down)",
+        "tooltip": "Navigate to the next failing test"
+      },
+      {
+        "command": "django-test-manager.previousFailingTest",
+        "title": "Previous Failing Test",
+        "icon": "$(arrow-up)",
+        "tooltip": "Navigate to the previous failing test"
       }
     ],
     "viewsContainers": {
@@ -216,6 +240,11 @@
           "command": "django-test-manager.triageFailedTests",
           "when": "view == djangoTestExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "django-test-manager.showNPlusOneResults",
+          "when": "view == djangoTestExplorer",
+          "group": "navigation@3.5"
         },
         {
           "command": "django-test-manager.collapseAll",
@@ -385,6 +414,21 @@
           "type": "number",
           "default": 50,
           "description": "Maximum number of test sessions to keep in history."
+        },
+        "djangoTestManager.detectNPlusOne": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable N+1 query detection. When enabled, injects a custom test runner that counts database queries per test and detects repeated (N+1) query patterns. Results appear as badges in the test tree and in the N+1 Results panel. No additional pip packages required."
+        },
+        "djangoTestManager.nplusoneThreshold": {
+          "type": "number",
+          "default": 3,
+          "description": "Minimum number of identical queries to flag as an N+1 pattern. Lower values are stricter."
+        },
+        "djangoTestManager.queryCountThreshold": {
+          "type": "number",
+          "default": 50,
+          "description": "Tests exceeding this total query count get a warning badge (⚠️) in the test tree."
         }
       }
     },
@@ -442,6 +486,21 @@
         "key": "ctrl+alt+c",
         "mac": "ctrl+cmd+c",
         "when": "djangoTestManager.isRunning"
+      },
+      {
+        "command": "django-test-manager.showNPlusOneResults",
+        "key": "ctrl+alt+n",
+        "mac": "ctrl+cmd+n"
+      },
+      {
+        "command": "django-test-manager.nextFailingTest",
+        "key": "ctrl+alt+]",
+        "mac": "ctrl+cmd+]"
+      },
+      {
+        "command": "django-test-manager.previousFailingTest",
+        "key": "ctrl+alt+[",
+        "mac": "ctrl+cmd+["
       }
     ]
   },

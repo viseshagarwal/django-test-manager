@@ -15,6 +15,8 @@ import { TestHistoryManager, TestHistoryTreeProvider } from './testHistory';
 import { isTestClassFromLine } from './testUtils';
 import { NativeTestController } from './nativeTestController';
 import { TriagePanel } from './triagePanel';
+import { NPlusOnePanel } from './nplusonePanel';
+import { FailureNavigator } from './failureNavigator';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Django Test Manager is now active!');
@@ -54,7 +56,10 @@ export function activate(context: vscode.ExtensionContext) {
     const coverageProvider = new CoverageProvider(workspaceRoot);
     // Load existing coverage if available
     coverageProvider.loadCoverage();
-    const testRunner = new TestRunner(resolvedWorkspaceRoot, testTreeDataProvider, coverageProvider);
+    const testRunner = new TestRunner(resolvedWorkspaceRoot, testTreeDataProvider, coverageProvider, context.extensionPath);
+
+    // Initialize Failure Navigator
+    const failureNavigator = new FailureNavigator(testTreeDataProvider);
 
     // Initialize Watch Mode
     const watchModeManager = new WatchModeManager(resolvedWorkspaceRoot, testRunner);
@@ -450,6 +455,22 @@ export function activate(context: vscode.ExtensionContext) {
             if (testAtCursor) {
                 vscode.commands.executeCommand('django-test-manager.debugTest', testAtCursor);
             }
+        }),
+
+        // N+1 Query Detection panel
+        vscode.commands.registerCommand('django-test-manager.showNPlusOneResults', () => {
+            NPlusOnePanel.createOrShow(context.extensionUri);
+        }),
+
+        // Failure navigation commands
+        vscode.commands.registerCommand('django-test-manager.openFirstFailingTest', () => {
+            failureNavigator.openFirstFailing();
+        }),
+        vscode.commands.registerCommand('django-test-manager.nextFailingTest', () => {
+            failureNavigator.openNextFailing();
+        }),
+        vscode.commands.registerCommand('django-test-manager.previousFailingTest', () => {
+            failureNavigator.openPreviousFailing();
         })
     );
 

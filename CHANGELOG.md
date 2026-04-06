@@ -5,6 +5,39 @@ All notable changes to Django Test Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-02-21
+
+### Added
+
+#### 🔍 N+1 Query Detection (Django Superpower)
+
+- **Zero-config query counting** — Enable "Detect N+1" in settings and every test automatically shows how many DB queries it executes. No extra pip packages required — uses only Django built-ins (`connection.queries` + `force_debug_cursor`).
+- **Automatic N+1 pattern detection** — The extension normalizes SQL queries and flags repeated patterns (e.g. the same SELECT with different IDs executed 50 times = classic N+1).
+- **Tree view badges** — Each test method shows `🔍12q` (query count), `⚠️` (exceeds threshold), and `🔴N+1` (duplicate query pattern detected).
+- **N+1 Results Panel** — Rich WebView dashboard showing stat cards, per-test query counts sorted by volume, and detailed N+1 patterns with the normalized SQL. Open with `Ctrl+Cmd+N` / `Ctrl+Alt+N`.
+- **Output channel report** — After each test run, a structured N+1 report is printed to the Django Test Runner output channel.
+- **Configurable thresholds**:
+  - `djangoTestManager.nplusoneThreshold` (default: 3) — Minimum identical queries to flag as N+1
+  - `djangoTestManager.queryCountThreshold` (default: 50) — Tests exceeding this get ⚠️ badge
+
+#### 🐛 Failure Navigation & Error Tips
+
+- **One-key failure navigation** — Jump between failing tests with keyboard shortcuts:
+  - `Ctrl+Cmd+]` / `Ctrl+Alt+]` — Next failing test
+  - `Ctrl+Cmd+[` / `Ctrl+Alt+[` — Previous failing test
+  - `Open First Failing Test` command available from command palette
+- **"Explain This Failure"** — 17 common Django error patterns are recognized and actionable tips are shown as toasts when navigating to a failure:
+  - `IntegrityError UNIQUE constraint failed` → "Duplicate data in factory/fixture"
+  - `NoReverseMatch` → "Check URL name / namespace"
+  - `DoesNotExist` → "Check test fixtures create expected objects"
+  - `TransactionManagementError` → "Use TransactionTestCase"
+  - And 13 more patterns...
+
+### Improved
+
+- **Triage panel** — N+1 results button added to the explorer toolbar
+- **Test state manager** — Extended with query count and N+1 warning storage
+
 ## [0.3.3] - 2025-12-20
 
 ### Fixed

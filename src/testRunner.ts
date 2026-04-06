@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
 import * as path from "path";
+import * as fs from "fs";
+import * as os from "os";
 import { TestNode } from "./testDiscovery";
 import { TestTreeDataProvider } from "./testTree";
 import { TestStateManager } from "./testStateManager";
@@ -17,11 +19,13 @@ export class TestRunner {
     private refreshTimeout: NodeJS.Timeout | undefined;
     private lastRefreshTime: number = 0;
     private readonly REFRESH_INTERVAL = 200;
+    private dtmOutputFile: string | undefined;
 
     constructor(
         private workspaceRoot: string,
         private treeDataProvider: TestTreeDataProvider,
-        private coverageProvider?: CoverageProvider
+        private coverageProvider?: CoverageProvider,
+        private extensionPath?: string
     ) {
         this.outputChannel =
             vscode.window.createOutputChannel("Django Test Runner");
@@ -55,6 +59,9 @@ export class TestRunner {
         this.outputChannel.appendLine(`Running: ${fullCmd}`);
 
         const env = await getMergedEnvironmentVariables(this.workspaceRoot);
+
+        // Configure N+1 env vars (PYTHONPATH + DTM_OUTPUT_FILE) for the run() path too
+        this.applyNPlusOneEnv(env);
 
         return vscode.window.withProgress(
             {
@@ -103,6 +110,8 @@ export class TestRunner {
                             );
                         }
                         this.parseResults(node, buffer);
+                        // Load N+1 results from the JSON file (works in all modes)
+                        this.loadNPlusOneResultsFromFile();
                         resolve();
                     });
 
@@ -301,6 +310,15 @@ export class TestRunner {
             testArgs.push("--noinput");
         }
 
+        // Inject custom test runner for N+1 query detection
+        const detectNPlusOne = config.get<boolean>("detectNPlusOne") || false;
+        if (detectNPlusOne && !testArgs.includes("--testrunner")) {
+            testArgs.push("--testrunner", "dtm_query_counter.DTMQueryCountingRunner");
+            this.outputChannel.appendLine(`[N+1] Injected --testrunner dtm_query_counter.DTMQueryCountingRunner`);
+        } else if (!detectNPlusOne) {
+            this.outputChannel.appendLine(`[N+1] detectNPlusOne setting is OFF — skipping query detection.`);
+        }
+
         const commandTemplate =
             config.get<string>("testCommandTemplate") ||
             "${pythonPath} ${managePyPath} test ${testPath} ${testArguments}";
@@ -410,6 +428,19 @@ export class TestRunner {
         }, 200); // Process buffer every 200ms
 
         const env = await getMergedEnvironmentVariables(this.workspaceRoot);
+        this.applyNPlusOneEnv(env);
+
+        const config = vscode.workspace.getConfiguration("djangoTestManager");
+        const detectNPlusOne = config.get<boolean>("detectNPlusOne") || false;
+        if (detectNPlusOne) {
+            this.djangoTerminal.write('\r\n\x1b[36m[Django Test Manager] 🔍 N+1 Query Detection is ENABLED.\r\n');
+            this.djangoTerminal.write(`PYTHONPATH includes: ${env['PYTHONPATH'] || '(not set)'}\r\n`);
+            this.djangoTerminal.write(`DTM_OUTPUT_FILE: ${env['DTM_OUTPUT_FILE'] || '(not set)'}\r\n`);
+            this.djangoTerminal.write('Results will appear in the test tree and the N+1 panel after the run.\x1b[0m\r\n\r\n');
+        } else {
+            this.djangoTerminal.write('\r\n\x1b[33m[Django Test Manager] N+1 detection is OFF. Enable it in Settings > djangoTestManager.detectNPlusOne\x1b[0m\r\n');
+        }
+
         this.djangoTerminal.runCommand(
             cmd,
             args,
@@ -429,6 +460,10 @@ export class TestRunner {
                 this.processParsingBuffer(nodeToWatch); // Keep original logic for processing remaining buffer
                 this.finalizeNodeStatus(nodeToWatch, code === 0);
                 this.printTestDurationReport();
+
+                // Load N+1 results from the JSON file (primary data channel, works with parallel)
+                this.loadNPlusOneResultsFromFile();
+                this.printNPlusOneSummary();
 
                 // End the test history session
                 const historyManager = TestHistoryManager.getInstance();
@@ -562,6 +597,10 @@ export class TestRunner {
     private static readonly SUMMARY_REGEX = /(FAIL|ERROR):\s+(\w+)\s+\((.+?)\)/;
     private static readonly SEPARATOR_LINE = '----------------------------------------------------------------------';
 
+    // N+1 query detection markers
+    private static readonly DTM_QUERIES_REGEX = /\[DTM:QUERIES\]\s+([\w.]+):\s+(\d+)/;
+    private static readonly DTM_NPLUSONE_REGEX = /\[DTM:NPLUSONE\]\s+([\w.]+)\s+\|\s+(\d+)\s+\|\s+(.+)/;
+
     private parseResults(node: TestNode, output: string) {
         // Strip ANSI codes
         const cleanOutput = output.replace(TestRunner.ANSI_CODE_REGEX, "");
@@ -577,6 +616,24 @@ export class TestRunner {
 
             // Skip empty lines quickly
             if (line.length === 0) continue;
+
+            // ── N+1 query detection markers ──────────────────────
+            const queryMatch = TestRunner.DTM_QUERIES_REGEX.exec(line);
+            if (queryMatch) {
+                const testPath = queryMatch[1];
+                const queryCount = parseInt(queryMatch[2], 10);
+                stateManager.setQueryCount(testPath, queryCount);
+                continue;
+            }
+
+            const nplusoneMatch = TestRunner.DTM_NPLUSONE_REGEX.exec(line);
+            if (nplusoneMatch) {
+                const testPath = nplusoneMatch[1];
+                const count = parseInt(nplusoneMatch[2], 10);
+                const sql = nplusoneMatch[3].trim();
+                stateManager.addNPlusOneWarning(testPath, { count, sql });
+                continue;
+            }
 
             // Check for start of a test: test_method (path.to.test)
             const testStartMatch = TestRunner.TEST_START_REGEX.exec(line);
@@ -724,6 +781,159 @@ export class TestRunner {
         const fullMessage = lines.join('\n').trim();
         if (fullMessage) {
             TestStateManager.getInstance().setFailureMessage(testPath, fullMessage);
+        }
+    }
+
+    private printNPlusOneSummary() {
+        const stateManager = TestStateManager.getInstance();
+        const allWarnings = stateManager.getAllNPlusOneWarnings();
+        const allQueryCounts = stateManager.getAllQueryCounts();
+
+        if (allQueryCounts.size === 0) {
+            return;
+        }
+
+        const config = vscode.workspace.getConfiguration("djangoTestManager");
+        const queryThreshold = config.get<number>("queryCountThreshold") || 50;
+
+        // Collect tests over the threshold
+        const overThreshold = Array.from(allQueryCounts.entries())
+            .filter(([, count]) => count >= queryThreshold)
+            .sort((a, b) => b[1] - a[1]);
+
+        // Collect N+1 tests
+        const nplusOneTests = Array.from(allWarnings.entries())
+            .filter(([, warnings]) => warnings.length > 0);
+
+        if (overThreshold.length === 0 && nplusOneTests.length === 0) {
+            this.outputChannel.appendLine(
+                "\n----------------------------------------------------------------------"
+            );
+            this.outputChannel.appendLine("N+1 Query Report: All clear! ✅");
+            this.outputChannel.appendLine(
+                "----------------------------------------------------------------------"
+            );
+            return;
+        }
+
+        this.outputChannel.appendLine(
+            "\n----------------------------------------------------------------------"
+        );
+        this.outputChannel.appendLine("🔍 N+1 Query Detection Report:");
+
+        if (nplusOneTests.length > 0) {
+            this.outputChannel.appendLine(`\n  🔴 N+1 Patterns Found in ${nplusOneTests.length} test(s):`);
+            for (const [testPath, warnings] of nplusOneTests) {
+                const queryCount = allQueryCounts.get(testPath) || 0;
+                this.outputChannel.appendLine(`\n    ${testPath} (${queryCount} queries)`);
+                for (const w of warnings) {
+                    this.outputChannel.appendLine(`      ${w.count}× ${w.sql.substring(0, 120)}`);
+                }
+            }
+        }
+
+        if (overThreshold.length > 0) {
+            this.outputChannel.appendLine(`\n  ⚠️  High Query Count (≥${queryThreshold}):`);
+            for (const [testPath, count] of overThreshold) {
+                this.outputChannel.appendLine(`    ${count}q  ${testPath}`);
+            }
+        }
+
+        this.outputChannel.appendLine(
+            "----------------------------------------------------------------------"
+        );
+    }
+
+    /**
+     * Set N+1-related environment variables on the given env object.
+     * Used by BOTH the run() and runInTerminal() code paths.
+     */
+    private applyNPlusOneEnv(env: NodeJS.ProcessEnv): void {
+        const config = vscode.workspace.getConfiguration("djangoTestManager");
+        const detectNPlusOne = config.get<boolean>("detectNPlusOne") || false;
+
+        if (!detectNPlusOne) {
+            this.outputChannel.appendLine(`[N+1] applyNPlusOneEnv: detectNPlusOne is OFF, skipping.`);
+            return;
+        }
+        if (!this.extensionPath) {
+            this.outputChannel.appendLine(`[N+1] applyNPlusOneEnv: extensionPath is undefined! Cannot find resources/dtm_query_counter.py`);
+            return;
+        }
+        this.outputChannel.appendLine(`[N+1] applyNPlusOneEnv: extensionPath=${this.extensionPath}`);
+
+        // Add resources/ to PYTHONPATH so dtm_query_counter is importable
+        const resourcesDir = path.join(this.extensionPath, 'resources');
+        const existing = env['PYTHONPATH'] || '';
+        env['PYTHONPATH'] = existing
+            ? `${resourcesDir}${path.delimiter}${existing}`
+            : resourcesDir;
+
+        // Thresholds
+        env['DTM_QUERY_THRESHOLD'] = String(config.get<number>('queryCountThreshold') || 50);
+        env['DTM_NPLUSONE_THRESHOLD'] = String(config.get<number>('nplusoneThreshold') || 3);
+
+        // JSON output file — primary data channel, works with parallel execution
+        this.dtmOutputFile = path.join(os.tmpdir(), `dtm_queries_${Date.now()}.json`);
+        env['DTM_OUTPUT_FILE'] = this.dtmOutputFile;
+    }
+
+    /**
+     * Read N+1 query results from the JSON file written by dtm_query_counter.py.
+     * This is the PRIMARY data channel — it works in ALL modes including parallel.
+     * Falls back gracefully if the file doesn't exist (e.g., setting not enabled).
+     */
+    private loadNPlusOneResultsFromFile(): void {
+        if (!this.dtmOutputFile) {
+            this.outputChannel.appendLine(`[N+1] loadResults: no dtmOutputFile configured (N+1 detection was not active).`);
+            return;
+        }
+
+        this.outputChannel.appendLine(`[N+1] loadResults: checking for ${this.dtmOutputFile}`);
+
+        try {
+            if (!fs.existsSync(this.dtmOutputFile)) {
+                this.outputChannel.appendLine(`[N+1] loadResults: file NOT found - the Python runner may not have written it. Check for import errors in the terminal.`);
+                return;
+            }
+
+            const raw = fs.readFileSync(this.dtmOutputFile, 'utf-8');
+            // JSONL format: one JSON object per line (each worker appends lines)
+            const stateManager = TestStateManager.getInstance();
+            const lines = raw.split('\n').filter(l => l.trim());
+            let loadedCount = 0;
+
+            for (const line of lines) {
+                try {
+                    const obj: Record<string, { count: number; nplusone: Array<{ count: number; sql: string }> }> = JSON.parse(line);
+                    for (const [testPath, result] of Object.entries(obj)) {
+                        stateManager.setQueryCount(testPath, result.count);
+                        if (result.nplusone) {
+                            for (const warning of result.nplusone) {
+                                stateManager.addNPlusOneWarning(testPath, warning);
+                            }
+                        }
+                        loadedCount++;
+                    }
+                } catch (_lineErr) {
+                    // skip malformed lines
+                }
+            }
+
+            this.outputChannel.appendLine(
+                `\n[N+1] Loaded query data for ${loadedCount} tests from results file (${lines.length} lines).`
+            );
+
+            // Clean up
+            try {
+                fs.unlinkSync(this.dtmOutputFile);
+            } catch (_e) {
+                // ignore cleanup errors
+            }
+        } catch (e) {
+            this.outputChannel.appendLine(`[N+1] Could not read results file: ${e}`);
+        } finally {
+            this.dtmOutputFile = undefined;
         }
     }
 

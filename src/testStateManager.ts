@@ -8,6 +8,8 @@ export class TestStateManager {
     private failureMessages = new Map<string, string>();
     private durations = new Map<string, number>();
     private diffs = new Map<string, { expected: string; actual: string }>();
+    private queryCounts = new Map<string, number>();
+    private nplusOneWarnings = new Map<string, Array<{ count: number; sql: string }>>();
 
     private _onDidChangeStatus = new vscode.EventEmitter<void>();
     public readonly onDidChangeStatus = this._onDidChangeStatus.event;
@@ -81,6 +83,8 @@ export class TestStateManager {
         this.failureMessages.clear();
         this.durations.clear();
         this.diffs.clear();
+        this.queryCounts.clear();
+        this.nplusOneWarnings.clear();
 
         if (this.fireTimeout) {
             clearTimeout(this.fireTimeout);
@@ -125,6 +129,35 @@ export class TestStateManager {
 
     public getDurations(): Map<string, number> {
         return this.durations;
+    }
+
+    // ── Query count methods (N+1 detection) ────────────────
+
+    public setQueryCount(dottedPath: string, count: number): void {
+        this.queryCounts.set(dottedPath, count);
+    }
+
+    public getQueryCount(dottedPath: string): number | undefined {
+        return this.queryCounts.get(dottedPath);
+    }
+
+    public getAllQueryCounts(): Map<string, number> {
+        return this.queryCounts;
+    }
+
+    public addNPlusOneWarning(dottedPath: string, warning: { count: number; sql: string }): void {
+        if (!this.nplusOneWarnings.has(dottedPath)) {
+            this.nplusOneWarnings.set(dottedPath, []);
+        }
+        this.nplusOneWarnings.get(dottedPath)!.push(warning);
+    }
+
+    public getNPlusOneWarnings(dottedPath: string): Array<{ count: number; sql: string }> | undefined {
+        return this.nplusOneWarnings.get(dottedPath);
+    }
+
+    public getAllNPlusOneWarnings(): Map<string, Array<{ count: number; sql: string }>> {
+        return this.nplusOneWarnings;
     }
 
     /**

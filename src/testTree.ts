@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { TestDiscovery, TestNode } from "./testDiscovery";
 import { TestStateManager } from "./testStateManager";
+import { TestHistoryManager } from "./testHistory";
 
 export class TestTreeDataProvider implements vscode.TreeDataProvider<TestItem> {
 	private _onDidChangeTreeData: vscode.EventEmitter<
@@ -139,14 +140,46 @@ export class TestItem extends vscode.TreeItem {
 		}
 
 		if (node.dottedPath) {
-			const duration = TestStateManager.getInstance().getDuration(
-				node.dottedPath
-			);
+			const stateManager = TestStateManager.getInstance();
+			const duration = stateManager.getDuration(node.dottedPath);
 			if (duration !== undefined && status !== "running") {
 				if (duration >= 1000) {
 					text += ` (${(duration / 1000).toFixed(2)}s)`;
 				} else {
 					text += ` (${Math.round(duration)}ms)`;
+				}
+			}
+
+			if (status !== "running" && node.type === "method") {
+				try {
+					const avgDuration = TestHistoryManager.getInstance().getAverageTestDuration(node.dottedPath);
+					// If average duration is greater than 1 second, flag as slow
+					if (avgDuration && avgDuration >= 1000) {
+						text += ` 🐌 Slow`;
+					}
+					// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				} catch (_e) {
+					// TestHistoryManager might not be initialized yet
+				}
+
+				// N+1 query detection badges
+				const queryCount = stateManager.getQueryCount(node.dottedPath);
+				if (queryCount !== undefined) {
+					text += ` 🔍${queryCount}q`;
+					try {
+						const queryThreshold = vscode.workspace
+							.getConfiguration("djangoTestManager")
+							.get<number>("queryCountThreshold") || 50;
+						if (queryCount >= queryThreshold) {
+							text += ` ⚠️`;
+						}
+						// eslint-disable-next-line @typescript-eslint/no-unused-vars
+					} catch (__e) { /* config not available */ }
+				}
+
+				const nplusOneWarnings = stateManager.getNPlusOneWarnings(node.dottedPath);
+				if (nplusOneWarnings && nplusOneWarnings.length > 0) {
+					text += ` 🔴N+1`;
 				}
 			}
 		}
